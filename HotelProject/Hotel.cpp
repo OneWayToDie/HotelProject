@@ -58,7 +58,18 @@ namespace HotelLogic
         if (room && room->GetStatus() == RoomStatus::Free) {
             room->SetStatus(RoomStatus::Occupied);
             room->SetGuest(guestName, passport);
-            room->SetBookingDates(inDate, outDate, days); // —Óı‡ÌˇÂÏ ‰‡Ú˚
+            room->SetBookingDates(inDate, outDate, days);
+
+            // --- ÕŒ¬Œ≈: ƒÓ·‡‚ÎˇÂÏ „ÓÒÚˇ ‚ ·‡ÁÛ, ÂÒÎË Â„Ó Ú‡Ï Â˘Â ÌÂÚ ---
+            bool exists = false;
+            for (auto& g : allGuests) {
+                if (g->passport == passport) { exists = true; break; }
+            }
+            if (!exists) {
+                allGuests.push_back(std::make_shared<Guest>(nextGuestId++, guestName, passport));
+            }
+            // -----------------------------------------------------------
+
             return true;
         }
         return false;
@@ -109,6 +120,10 @@ namespace HotelLogic
                     << r->GetCheckInDate() << "\t" << r->GetCheckOutDate() << "\n";
             }
         }
+        // —Óı‡ÌˇÂÏ ·‡ÁÛ „ÓÒÚÂÈ
+        for (auto& g : allGuests) {
+            out << "GUEST\t" << g->id << "\t" << g->fullName << "\t" << g->passport << "\n";
+        }
         out.close();
         return true;
     }
@@ -117,10 +132,12 @@ namespace HotelLogic
         std::ifstream in(filename);
         if (!in.is_open()) return false;
 
-        // Œ˜Ë˘‡ÂÏ ÚÂÍÛ˘ËÂ ‰‡ÌÌ˚Â
+        // Œ˜Ë˘‡ÂÏ ÚÂÍÛ˘ËÂ ‰‡ÌÌ˚Â (¬—®, ‚ÍÎ˛˜‡ˇ „ÓÒÚÂÈ!)
         buildings.clear();
+        allGuests.clear();      // <--- ƒŒ¡¿¬»À» Œ◊»—“ ” √Œ—“≈…
         nextBuildingId = 1;
         nextRoomId = 1;
+        nextGuestId = 1;        // <--- —¡–¿—€¬¿≈Ã —◊≈“◊»  √Œ—“≈…
 
         std::string line;
         while (std::getline(in, line)) {
@@ -133,7 +150,10 @@ namespace HotelLogic
                 std::getline(ss, idStr, '\t');
                 std::getline(ss, name, '\t');
 
-                int id = std::stoi(idStr);
+                int id = 0;
+                try { id = std::stoi(idStr); }
+                catch (...) { continue; }
+
                 AddBuilding(name);
                 if (id >= nextBuildingId) nextBuildingId = id + 1;
             }
@@ -145,15 +165,19 @@ namespace HotelLogic
                 std::getline(ss, statusStr, '\t');
                 std::getline(ss, typeName, '\t');
                 std::getline(ss, priceStr, '\t');
-                std::getline(ss, daysStr, '\t'); // <-- ƒŒ¡¿¬»À» ◊“≈Õ»≈ ƒÕ≈…
+                std::getline(ss, daysStr, '\t');
                 std::getline(ss, guest, '\t');
                 std::getline(ss, passport, '\t');
                 std::getline(ss, inDate, '\t');
                 std::getline(ss, outDate, '\t');
 
-                int id = std::stoi(idStr);
-                int bId = std::stoi(bIdStr);
-                int status = std::stoi(statusStr);
+                int id = 0, bId = 0, status = 0;
+                try {
+                    id = std::stoi(idStr);
+                    bId = std::stoi(bIdStr);
+                    status = std::stoi(statusStr);
+                }
+                catch (...) { continue; }
 
                 double price = 2000.0;
                 if (!priceStr.empty()) { try { price = std::stod(priceStr); } catch (...) {} }
@@ -168,9 +192,25 @@ namespace HotelLogic
                 if (room) {
                     room->SetStatus((RoomStatus)status);
                     room->SetGuest(guest, passport);
-                    room->SetBookingDates(inDate, outDate, days); // <-- ¬Œ——“¿Õ¿¬À»¬¿≈Ã ƒÕ»
+                    room->SetBookingDates(inDate, outDate, days);
                 }
                 if (id >= nextRoomId) nextRoomId = id + 1;
+            }
+            // ==========================================
+            // ÕŒ¬€… ¡ÀŒ  ƒÀﬂ ◊“≈Õ»ﬂ √Œ—“≈…
+            // ==========================================
+            else if (type == "GUEST") {
+                std::string idStr, name, passport;
+                std::getline(ss, idStr, '\t');
+                std::getline(ss, name, '\t');
+                std::getline(ss, passport, '\t');
+
+                int id = 0;
+                try { id = std::stoi(idStr); }
+                catch (...) { continue; }
+
+                allGuests.push_back(std::make_shared<Guest>(id, name, passport));
+                if (id >= nextGuestId) nextGuestId = id + 1;
             }
         }
         in.close();

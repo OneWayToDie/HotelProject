@@ -8,17 +8,17 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Поиск -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
-            <TextBox Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Поиск по фамилии" Width="250"/>
-            <Button Content="Найти" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10,0,0,0"/>
-        </StackPanel>
+        <TextBlock Text="База гостей отеля" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
 
-        <!-- Список гостей (Заглушка) -->
-        <materialDesign:Card Grid.Row="1" Padding="20">
-            <TextBlock Text="Здесь будет список гостей с историей проживания..." 
-                       HorizontalAlignment="Center" VerticalAlignment="Center" 
-                       Foreground="Gray" FontSize="16" FontStyle="Italic"/>
+        <materialDesign:Card Grid.Row="1" Padding="0">
+            <DataGrid ItemsSource="{Binding Guests}" AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="80"/>
+                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="*"/>
+                    <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="200"/>
+                </DataGrid.Columns>
+            </DataGrid>
         </materialDesign:Card>
     </Grid>
 </UserControl>

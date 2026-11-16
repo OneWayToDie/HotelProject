@@ -1,5 +1,6 @@
 #pragma once
 #include "Room.h"
+#include "Guest.h"
 #include <vector>
 #include <memory>
 #include <string>
@@ -25,8 +26,10 @@ namespace HotelLogic {
     class Hotel {
     private:
         std::vector<std::shared_ptr<Building>> buildings; // Гостиница содержит здания
+        std::vector<std::shared_ptr<Guest>> allGuests;
         int nextBuildingId;
         int nextRoomId;
+        int nextGuestId = 1;
 
     public:
         Hotel();
@@ -46,5 +49,6 @@ namespace HotelLogic {
         std::shared_ptr<Room> FindRoomById(int roomId);
         const std::vector<std::shared_ptr<Building>>& GetBuildings() const { return buildings; }
         std::vector<std::shared_ptr<Room>> GetAllRooms() const;
+        const std::vector<std::shared_ptr<Guest>>& GetAllGuests() const { return allGuests; }
     };
 }

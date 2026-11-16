@@ -130,6 +130,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Guest.h" />
     <ClInclude Include="Hotel.h" />
     <ClInclude Include="Room.h" />
   </ItemGroup>

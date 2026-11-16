@@ -26,6 +26,14 @@ namespace HotelApp.Services
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 100)] public string Name;
 	}
 
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+	public struct CGuest
+	{
+		public int Id;
+		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 100)] public string FullName;
+		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 50)] public string Passport;
+	}
+
 	internal static class NativeMethods
 	{
 		private const string DllName = "HotelLogic.dll";
@@ -65,5 +73,8 @@ namespace HotelApp.Services
 
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllBuildings(IntPtr ptr, [Out] CBuilding[] buffer, int maxSize);
+
+		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+		public static extern int Hotel_GetAllGuests(IntPtr ptr, [Out] CGuest[] buffer, int maxSize);
 	}
 }

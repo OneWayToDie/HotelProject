@@ -19,9 +19,17 @@ namespace HotelApp
 		{
 			if (DataContext is MainViewModel vm && MenuList != null)
 			{
-				if (MenuList.SelectedIndex == 0) vm.CurrentView = new RoomsViewModel(vm.HotelPtr, vm);
-				else if (MenuList.SelectedIndex == 1) vm.CurrentView = new TextBlock { Text = "База гостей (в разработке)", Margin = new Thickness(20), FontSize = 20 };
-				else if (MenuList.SelectedIndex == 2) vm.CurrentView = new TextBlock { Text = "Аналитика (в разработке)", Margin = new Thickness(20), FontSize = 20 };
+				if (MenuList.SelectedIndex == 0) // Номера и Фонд
+					vm.CurrentView = new RoomsViewModel(vm.HotelPtr, vm);
+
+				else if (MenuList.SelectedIndex == 1) // База гостей
+					vm.CurrentView = new GuestsView { DataContext = new GuestsViewModel(vm.HotelPtr) };
+
+				else if (MenuList.SelectedIndex == 2) // Аналитика
+					vm.CurrentView = new AnalyticsView { DataContext = new AnalyticsViewModel(vm.HotelPtr) };
+
+				else if (MenuList.SelectedIndex == 3) // Карта отеля
+					vm.CurrentView = new MapView { DataContext = new MapViewModel(vm.HotelPtr) };
 			}
 		}
 

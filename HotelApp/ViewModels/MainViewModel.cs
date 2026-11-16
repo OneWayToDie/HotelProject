@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using HotelApp.Models;
 using HotelApp.Services;
 
 namespace HotelApp.ViewModels
@@ -9,7 +10,7 @@ namespace HotelApp.ViewModels
 	public class MainViewModel : INotifyPropertyChanged
 	{
 		public IntPtr HotelPtr { get; private set; }
-		public ObservableCollection<string> EventLog { get; } = new ObservableCollection<string>();
+		public ObservableCollection<LogEntry> EventLog { get; } = new ObservableCollection<LogEntry>();
 
 		private object _currentView;
 		public object CurrentView
@@ -70,10 +71,15 @@ namespace HotelApp.ViewModels
 			OccupiedRooms = occupied;
 		}
 
-		public void AddLog(string message)
+		// ОБНОВЛЕННЫЙ МЕТОД ДОБАВЛЕНИЯ ЛОГА (принимает тип)
+		public void AddLog(string message, LogType type = LogType.Info)
 		{
-			string timestamp = DateTime.Now.ToString("HH:mm:ss");
-			EventLog.Add($"[{timestamp}] {message}");
+			EventLog.Add(new LogEntry
+			{
+				Time = DateTime.Now.ToString("HH:mm:ss"),
+				Message = message,
+				Type = type
+			});
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;

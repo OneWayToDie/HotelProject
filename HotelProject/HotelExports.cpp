@@ -19,10 +19,15 @@ struct CRoom {
     char checkOutDate[20];
 };
 
-// Структура для зданий (вынесена наверх, для чистоты)
 struct CBuilding {
     int id;
     char name[100];
+};
+
+struct CGuest {
+    int id;
+    char fullName[100];
+    char passport[50];
 };
 #pragma pack(pop)
 
@@ -62,6 +67,7 @@ extern "C" {
     __declspec(dllexport) void Hotel_FinishCleaning(void* ptr, int roomId) {
         if (ptr) static_cast<Hotel*>(ptr)->FinishCleaning(roomId);
     }
+
     __declspec(dllexport) void Hotel_UpdatePrice(void* ptr, int roomId, double newPrice) {
         if (ptr) static_cast<Hotel*>(ptr)->UpdateRoomPrice(roomId, newPrice);
     }
@@ -89,14 +95,12 @@ extern "C" {
             CopyStr(buffer[i].guestName, sizeof(buffer[i].guestName), r->GetGuestName());
             CopyStr(buffer[i].guestPassport, sizeof(buffer[i].guestPassport), r->GetGuestPassport());
 
-            // НОВОЕ: копируем даты
             CopyStr(buffer[i].checkInDate, sizeof(buffer[i].checkInDate), r->GetCheckInDate());
             CopyStr(buffer[i].checkOutDate, sizeof(buffer[i].checkOutDate), r->GetCheckOutDate());
         }
         return count;
     }
 
-    // НАША НОВАЯ ФУНКЦИЯ
     __declspec(dllexport) int Hotel_GetAllBuildings(void* ptr, CBuilding* buffer, int maxSize) {
         if (!ptr) return 0;
         Hotel* hotel = static_cast<Hotel*>(ptr);
@@ -120,5 +124,21 @@ extern "C" {
     __declspec(dllexport) bool Hotel_Load(void* ptr, const char* filename) {
         if (!ptr) return false;
         return static_cast<Hotel*>(ptr)->LoadFromFile(filename);
+    }
+
+    // ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ГОСТЕЙ (ТОЛЬКО ОДИН РАЗ)
+    __declspec(dllexport) int Hotel_GetAllGuests(void* ptr, CGuest* buffer, int maxSize) {
+        if (!ptr) return 0;
+        Hotel* hotel = static_cast<Hotel*>(ptr);
+        auto guests = hotel->GetAllGuests();
+        int count = (int)guests.size();
+        if (count > maxSize) count = maxSize;
+
+        for (int i = 0; i < count; i++) {
+            buffer[i].id = guests[i]->id;
+            CopyStr(buffer[i].fullName, sizeof(buffer[i].fullName), guests[i]->fullName);
+            CopyStr(buffer[i].passport, sizeof(buffer[i].passport), guests[i]->passport);
+        }
+        return count;
     }
 }

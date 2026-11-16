@@ -70,16 +70,24 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Models\BuildingModels.cs" />
+    <Compile Include="Models\GuestModel.cs" />
+    <Compile Include="Models\LogEntry.cs" />
     <Compile Include="Models\RoomModel.cs" />
     <Compile Include="Services\NativeMethods.cs" />
+    <Compile Include="ViewModels\AnalyticsViewModel.cs" />
+    <Compile Include="ViewModels\GuestViewModel.cs" />
     <Compile Include="ViewModels\HotelViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\MapViewModel.cs" />
     <Compile Include="ViewModels\RoomsViewModel.cs" />
     <Compile Include="Views\AnalyticsView.xaml.cs">
       <DependentUpon>AnalyticsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\GuestsView.xaml.cs">
       <DependentUpon>GuestsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\MapView.xaml.cs">
+      <DependentUpon>MapView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\RoomsView.xaml.cs">
       <DependentUpon>RoomsView.xaml</DependentUpon>
@@ -101,6 +109,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\GuestsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\MapView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

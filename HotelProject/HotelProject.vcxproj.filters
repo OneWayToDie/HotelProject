@@ -21,6 +21,9 @@
     <ClInclude Include="Hotel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Guest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Room.cpp">

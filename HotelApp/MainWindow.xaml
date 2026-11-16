@@ -132,6 +132,7 @@
                         <ListBoxItem Content="🏢 Номера и Фонд" Padding="20,12"/>
                         <ListBoxItem Content="👥 База гостей" Padding="20,12"/>
                         <ListBoxItem Content="📊 Аналитика" Padding="20,12"/>
+                        <ListBoxItem Content="🗺️ Карта отеля" Padding="20,12"/>
                     </ListBox>
                 </StackPanel>
             </Border>
