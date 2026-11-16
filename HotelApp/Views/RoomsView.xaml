@@ -1,0 +1,57 @@
+﻿<UserControl x:Class="HotelApp.Views.RoomsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Панель фильтров -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+            <TextBlock Text="Фильтр:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+            <!-- Добавили Tag и Checked -->
+            <RadioButton Content="Все" GroupName="RoomFilter" IsChecked="True" Tag="0" Checked="Filter_Checked" Margin="0,0,10,0"/>
+            <RadioButton Content="Свободные" GroupName="RoomFilter" Tag="1" Checked="Filter_Checked" Margin="0,0,10,0"/>
+            <RadioButton Content="Занятые" GroupName="RoomFilter" Tag="2" Checked="Filter_Checked"/>
+        </StackPanel>
+
+        <!-- Панель действий -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
+            <Button Content="Заселить гостя" Style="{StaticResource MaterialDesignRaisedButton}" 
+                    Click="CheckIn_Click" Margin="0,0,10,0" Width="150"/>
+            <Button Content="Выселить" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                    Click="CheckOut_Click" Margin="0,0,10,0" Width="150"/>
+            <!-- НОВАЯ КНОПКА УБОРКИ -->
+            <Button Content="Завершить уборку" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                    Click="FinishCleaning_Click" Width="150"/>
+            <Button Content="Изменить цену" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                    Click="EditPrice_Click" Width="150"/>
+        </StackPanel>
+
+        <!-- Таблица (остается без изменений) -->
+        <materialDesign:Card Grid.Row="2" Padding="0">
+            <DataGrid x:Name="RoomsGrid" ItemsSource="{Binding Rooms}" AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" HeadersVisibility="Column">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Номер" Binding="{Binding Number}" Width="80"/>
+                    <DataGridTextColumn Header="Тип" Binding="{Binding TypeText}" Width="120"/>
+                    <DataGridTextColumn Header="Цена" Binding="{Binding BasePrice, StringFormat={}{0:N0} ₽}" Width="100"/>
+                    <DataGridTextColumn Header="Гость" Binding="{Binding DisplayGuest}" Width="*"/>
+                    <DataGridTextColumn Header="Даты" Binding="{Binding DateDisplay}" Width="150"/>
+                    <DataGridTemplateColumn Header="Статус" Width="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding StatusColor}" CornerRadius="4" Padding="6,2" Margin="4">
+                                    <TextBlock Text="{Binding StatusText}" Foreground="White" FontWeight="Bold" TextAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </materialDesign:Card>
+    </Grid>
+</UserControl>

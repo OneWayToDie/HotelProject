@@ -1,0 +1,24 @@
+﻿<UserControl x:Class="HotelApp.Views.GuestsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Поиск -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+            <TextBox Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Поиск по фамилии" Width="250"/>
+            <Button Content="Найти" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- Список гостей (Заглушка) -->
+        <materialDesign:Card Grid.Row="1" Padding="20">
+            <TextBlock Text="Здесь будет список гостей с историей проживания..." 
+                       HorizontalAlignment="Center" VerticalAlignment="Center" 
+                       Foreground="Gray" FontSize="16" FontStyle="Italic"/>
+        </materialDesign:Card>
+    </Grid>
+</UserControl>
