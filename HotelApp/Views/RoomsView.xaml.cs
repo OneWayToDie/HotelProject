@@ -57,10 +57,37 @@ namespace HotelApp.Views
 
 					if (DataContext is RoomsViewModel vm)
 					{
+						// Логирование и обновление данных выполняет ViewModel
 						vm.CheckIn(selectedRoom.Id, guestName, passport, dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"), days);
-						if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
-							mainVm.AddLog($"Заселение: {guestName} -> Номер {selectedRoom.Number} ({days} дн.)");
 					}
+				}
+			}
+		}
+
+		// --- БРОНИРОВАНИЕ ---
+		private async void Book_Click(object sender, RoutedEventArgs e)
+		{
+			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
+			if (selectedRoom == null) { MessageBox.Show("Выберите номер!", "Бронирование", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+
+			var template = (DataTemplate)Application.Current.MainWindow.FindResource("BookingDialogTemplate");
+			var dialogContent = template.LoadContent() as FrameworkElement;
+			var result = await DialogHost.Show(dialogContent, "RootDialog");
+
+			if (result != null && result.ToString() == "True")
+			{
+				var card = dialogContent as MaterialDesignThemes.Wpf.Card;
+				var panel = card.Content as StackPanel;
+
+				string guestName = (panel.Children[1] as TextBox).Text;
+				string passport = (panel.Children[2] as TextBox).Text;
+				var dateIn = (panel.Children[4] as DatePicker).SelectedDate;
+				var dateOut = (panel.Children[6] as DatePicker).SelectedDate;
+
+				if (!string.IsNullOrWhiteSpace(guestName) && dateIn.HasValue && dateOut.HasValue && DataContext is RoomsViewModel vm)
+				{
+					vm.BookRoom(selectedRoom.Id, guestName, passport,
+						dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"));
 				}
 			}
 		}
@@ -84,14 +111,15 @@ namespace HotelApp.Views
 				{
 					if (DataContext is RoomsViewModel vm)
 					{
+						// Обновление цены и логирование выполняет ViewModel
 						vm.UpdatePrice(selectedRoom.Id, newPrice);
-
-						if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
-							mainVm.AddLog($"Номер {selectedRoom.Number}: новая цена {newPrice} ₽.");
 					}
 				}
 				else
 				{
+					if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
+						mainVm.AddLog($"Номер {selectedRoom.Number}: цена не изменена (некорректный ввод).", LogType.Error);
+
 					MessageBox.Show("Не удалось распознать цену! Введите просто число, например: 3000");
 				}
 			}
@@ -106,9 +134,8 @@ namespace HotelApp.Views
 
 			if (DataContext is RoomsViewModel vm)
 			{
+				// Логирование и обновление данных выполняет ViewModel
 				vm.CheckOut(selectedRoom.Id);
-				if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
-					mainVm.AddLog($"Выселение: Гость из номера {selectedRoom.Number} выехал.");
 			}
 		}
 
@@ -126,9 +153,8 @@ namespace HotelApp.Views
 
 			if (DataContext is RoomsViewModel vm)
 			{
+				// Логирование и обновление данных выполняет ViewModel
 				vm.FinishCleaning(selectedRoom.Id);
-				if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
-					mainVm.AddLog($"Уборка: Номер {selectedRoom.Number} готов к заселению.");
 			}
 		}
 	}

@@ -57,7 +57,7 @@
                         <TextBlock Text="Корпус:" Margin="0,0,0,5" Foreground="Gray"/>
                         <ComboBox x:Name="BuildingComboBox" Margin="0,0,0,15" 
                                   DisplayMemberPath="Name" SelectedValuePath="Id"
-                                  ItemsSource="{Binding Source={x:Static Application.Current}, Path=MainWindow.DataContext.CurrentView.Buildings}"/>
+                                  ItemsSource="{Binding Source={x:Static Application.Current}, Path=MainWindow.DataContext.Buildings}"/>
 
                         <TextBlock Text="Тип номера:" Margin="0,0,0,5" Foreground="Gray"/>
                         <ComboBox x:Name="RoomTypeComboBox" Margin="0,0,0,15" SelectedIndex="0">
@@ -108,7 +108,37 @@
                             <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
                                     Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}" Margin="0,0,10,0"/>
                             <Button Content="Заселить" Style="{StaticResource MaterialDesignRaisedButton}" 
-                                    Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}" CommandParameter="True"/>
+                                    Click="ConfirmCheckIn_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </materialDesign:Card.Content>
+            </materialDesign:Card>
+        </DataTemplate>
+
+        <!-- ШАБЛОН: ОКНО БРОНИРОВАНИЯ -->
+        <DataTemplate x:Key="BookingDialogTemplate">
+            <materialDesign:Card Width="380" UniformCornerRadius="8">
+                <materialDesign:Card.Content>
+                    <StackPanel Margin="24">
+                        <TextBlock Text="Бронирование номера" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
+
+                        <TextBox x:Name="BookingGuestNameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
+                                 materialDesign:HintAssist.Hint="ФИО Гостя" Margin="0,0,0,15"/>
+
+                        <TextBox x:Name="BookingGuestPassportTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
+                                 materialDesign:HintAssist.Hint="Паспорт" Margin="0,0,0,15"/>
+
+                        <TextBlock Text="Дата заезда:" Margin="0,0,0,5"/>
+                        <DatePicker x:Name="BookingCheckInDatePicker" Margin="0,0,0,15"/>
+
+                        <TextBlock Text="Дата выезда:" Margin="0,0,0,5"/>
+                        <DatePicker x:Name="BookingCheckOutDatePicker" Margin="0,0,0,20"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
+                                    Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}" Margin="0,0,10,0"/>
+                            <Button Content="Забронировать" Style="{StaticResource MaterialDesignRaisedButton}" 
+                                    Click="ConfirmBooking_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </materialDesign:Card.Content>
@@ -174,9 +204,17 @@
 
                 <!-- ЖУРНАЛ -->
                 <Border Grid.Row="2" Background="#1E1E1E" Padding="15">
-                    <ListBox Background="Transparent" BorderThickness="0">
-                        <ListBoxItem Foreground="#4CAF50" Content="[14:00] Система инициализирована."/>
-                        <ListBoxItem Foreground="#4CAF50" Content="[14:05] Загружены данные из HotelLogic.dll."/>
+                    <ListBox Background="Transparent" BorderThickness="0"
+                             ItemsSource="{Binding EventLog}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Time}" Foreground="Gray" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding Message}" Foreground="{Binding Color}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
                     </ListBox>
                 </Border>
             </Grid>

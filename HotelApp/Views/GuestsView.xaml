@@ -5,12 +5,22 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <TextBlock Text="База гостей отеля" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
 
-        <materialDesign:Card Grid.Row="1" Padding="0">
+        <!-- Живой поиск по ФИО и паспорту -->
+        <DockPanel Grid.Row="1" Width="340" HorizontalAlignment="Left" Margin="0,0,0,15">
+            <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" VerticalAlignment="Bottom"
+                                     Margin="0,0,8,8" Foreground="Gray"/>
+            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     materialDesign:HintAssist.Hint="Поиск по ФИО или паспорту"
+                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
+        </DockPanel>
+
+        <materialDesign:Card Grid.Row="2" Padding="0">
             <DataGrid ItemsSource="{Binding Guests}" AutoGenerateColumns="False" IsReadOnly="True"
                       CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>

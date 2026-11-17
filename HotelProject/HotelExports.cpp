@@ -29,6 +29,15 @@ struct CGuest {
     char fullName[100];
     char passport[50];
 };
+
+struct CBooking {
+    int id;
+    int roomId;
+    char guestName[100];
+    char passport[50];
+    char checkInDate[20];
+    char checkOutDate[20];
+};
 #pragma pack(pop)
 
 namespace {
@@ -138,6 +147,35 @@ extern "C" {
             buffer[i].id = guests[i]->id;
             CopyStr(buffer[i].fullName, sizeof(buffer[i].fullName), guests[i]->fullName);
             CopyStr(buffer[i].passport, sizeof(buffer[i].passport), guests[i]->passport);
+        }
+        return count;
+    }
+
+    __declspec(dllexport) double Hotel_GetTotalRevenue(void* ptr) {
+        if (!ptr) return 0.0;
+        return static_cast<Hotel*>(ptr)->GetTotalRevenue();
+    }
+
+    __declspec(dllexport) bool Hotel_BookRoom(void* ptr, int roomId, const char* name, const char* passport, const char* inDate, const char* outDate) {
+        if (!ptr) return false;
+        return static_cast<Hotel*>(ptr)->BookRoom(roomId, name, passport, inDate, outDate);
+    }
+
+    __declspec(dllexport) int Hotel_GetAllBookings(void* ptr, CBooking* buffer, int maxSize) {
+        if (!ptr) return 0;
+        Hotel* hotel = static_cast<Hotel*>(ptr);
+        auto bookings = hotel->GetAllBookings();
+        int count = (int)bookings.size();
+        if (count > maxSize) count = maxSize;
+
+        for (int i = 0; i < count; i++) {
+            auto b = bookings[i];
+            buffer[i].id = b->GetId();
+            buffer[i].roomId = b->GetRoomId();
+            CopyStr(buffer[i].guestName, sizeof(buffer[i].guestName), b->GetGuestName());
+            CopyStr(buffer[i].passport, sizeof(buffer[i].passport), b->GetGuestPassport());
+            CopyStr(buffer[i].checkInDate, sizeof(buffer[i].checkInDate), b->GetCheckInDate());
+            CopyStr(buffer[i].checkOutDate, sizeof(buffer[i].checkOutDate), b->GetCheckOutDate());
         }
         return count;
     }

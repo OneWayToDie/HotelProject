@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
 #include <iostream>
+#include <vector>
+#include <memory>
+#include "Booking.h"
 
 namespace HotelLogic {
 
@@ -20,6 +23,7 @@ namespace HotelLogic {
         std::string checkInDate;
         std::string checkOutDate;
         int bookedDays;
+        std::vector<std::shared_ptr<Booking>> bookings; // бронирования этого номера
         // Эти три метода перенесены в public ниже
 
     public:
@@ -61,6 +65,18 @@ namespace HotelLogic {
         std::string GetCheckInDate() const { return checkInDate; }
         std::string GetCheckOutDate() const { return checkOutDate; }
         int GetBookedDays() const { return bookedDays; }
+
+        // Бронирования номера
+        void AddBooking(std::shared_ptr<Booking> booking) { bookings.push_back(booking); }
+        const std::vector<std::shared_ptr<Booking>>& GetBookings() const { return bookings; }
+
+        // Есть ли пересечение с уже существующими бронями
+        bool HasBookingConflict(const std::string& inDate, const std::string& outDate) const {
+            for (auto& booking : bookings) {
+                if (booking->Overlaps(inDate, outDate)) return true;
+            }
+            return false;
+        }
     };
 
     // Класс Люкс (Наследник)

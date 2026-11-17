@@ -11,6 +11,7 @@ namespace HotelApp.ViewModels
 	{
 		public IntPtr HotelPtr { get; private set; }
 		public ObservableCollection<LogEntry> EventLog { get; } = new ObservableCollection<LogEntry>();
+		public ObservableCollection<BuildingModel> Buildings { get; } = new ObservableCollection<BuildingModel>();
 
 		private object _currentView;
 		public object CurrentView
@@ -51,6 +52,20 @@ namespace HotelApp.ViewModels
 
 			CurrentView = new RoomsViewModel(HotelPtr, this);
 			UpdateStats();
+			RefreshBuildings();
+		}
+
+		// Обновить список корпусов для диалога добавления номера
+		public void RefreshBuildings()
+		{
+			var buffer = new CBuilding[100];
+			int count = NativeMethods.Hotel_GetAllBuildings(HotelPtr, buffer, 100);
+
+			Buildings.Clear();
+			for (int i = 0; i < count; i++)
+			{
+				Buildings.Add(new BuildingModel { Id = buffer[i].Id, Name = buffer[i].Name });
+			}
 		}
 
 		// МЕТОД ПЕРЕСЧЕТА СТАТИСТИКИ
@@ -69,6 +84,36 @@ namespace HotelApp.ViewModels
 			TotalRooms = count;
 			FreeRooms = free;
 			OccupiedRooms = occupied;
+		}
+
+		// Проверка: не заняты ли выбранные даты чужой бронью
+		public bool HasBookingConflict(int roomId, string inDate, string outDate, string guestName = null, string passport = null)
+		{
+			var buffer = new CBooking[1000];
+			int count = NativeMethods.Hotel_GetAllBookings(HotelPtr, buffer, 1000);
+
+			for (int i = 0; i < count; i++)
+			{
+				if (buffer[i].RoomId != roomId) continue;
+
+				// Заселение самого гостя, оформившего бронь, не блокируем
+				bool ownBooking = false;
+				if (!string.IsNullOrWhiteSpace(guestName) &&
+					string.Equals(buffer[i].GuestName, guestName, StringComparison.OrdinalIgnoreCase))
+					ownBooking = true;
+				if (!ownBooking && !string.IsNullOrWhiteSpace(passport) &&
+					string.Equals(buffer[i].Passport, passport, StringComparison.OrdinalIgnoreCase))
+					ownBooking = true;
+
+				if (ownBooking) continue;
+
+				// Пересечение интервалов [inDate, outDate) и [bookingIn, bookingOut)
+				if (string.CompareOrdinal(inDate, buffer[i].CheckOutDate) < 0 &&
+					string.CompareOrdinal(buffer[i].CheckInDate, outDate) < 0)
+					return true;
+			}
+
+			return false;
 		}
 
 		// ОБНОВЛЕННЫЙ МЕТОД ДОБАВЛЕНИЯ ЛОГА (принимает тип)

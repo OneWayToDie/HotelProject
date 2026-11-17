@@ -51,11 +51,32 @@ namespace HotelApp.Views
 					var mainVm = Application.Current.MainWindow.DataContext as MainViewModel;
 					if (mainVm != null)
 					{
-						NativeMethods.Hotel_CheckIn(mainVm.HotelPtr, room.Id, guestName, passport,
-							dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"), days);
+						string inDate = dateIn.Value.ToString("yyyy-MM-dd");
+						string outDate = dateOut.Value.ToString("yyyy-MM-dd");
+
+						// Проверяем чужую бронь на выбранные даты
+						if (mainVm.HasBookingConflict(room.Id, inDate, outDate, guestName, passport))
+						{
+							MessageBox.Show($"Номер {room.Number} забронирован на выбранные даты!\nВыберите другие даты или снимите бронь.",
+								"Бронирование", MessageBoxButton.OK, MessageBoxImage.Warning);
+							return;
+						}
+
+						bool success = NativeMethods.Hotel_CheckIn(mainVm.HotelPtr, room.Id, guestName, passport,
+							inDate, outDate, days);
 
 						mainVm.SaveData();
-						mainVm.AddLog($"Заселение (Карта): {guestName} -> {room.Number}", LogType.Success);
+
+						if (success)
+						{
+							mainVm.AddLog($"Заселение (Карта): {guestName} -> {room.Number}", LogType.Success);
+						}
+						else
+						{
+							mainVm.AddLog($"Заселение (Карта) не выполнено: номер {room.Number} занят или на уборке.", LogType.Error);
+							MessageBox.Show($"Не удалось заселить гостя в номер {room.Number}.", "Ошибка",
+								MessageBoxButton.OK, MessageBoxImage.Warning);
+						}
 
 						// Обновляем карту
 						var mapVm = DataContext as MapViewModel;

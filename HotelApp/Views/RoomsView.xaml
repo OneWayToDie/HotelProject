@@ -9,24 +9,37 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Панель фильтров -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
-            <TextBlock Text="Фильтр:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-            <!-- Добавили Tag и Checked -->
-            <RadioButton Content="Все" GroupName="RoomFilter" IsChecked="True" Tag="0" Checked="Filter_Checked" Margin="0,0,10,0"/>
-            <RadioButton Content="Свободные" GroupName="RoomFilter" Tag="1" Checked="Filter_Checked" Margin="0,0,10,0"/>
-            <RadioButton Content="Занятые" GroupName="RoomFilter" Tag="2" Checked="Filter_Checked"/>
-        </StackPanel>
+        <!-- Панель фильтров и поиска -->
+        <Grid Grid.Row="0" Margin="0,0,0,15">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Фильтр:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                <!-- Добавили Tag и Checked -->
+                <RadioButton Content="Все" GroupName="RoomFilter" IsChecked="True" Tag="0" Checked="Filter_Checked" Margin="0,0,10,0"/>
+                <RadioButton Content="Свободные" GroupName="RoomFilter" Tag="1" Checked="Filter_Checked" Margin="0,0,10,0"/>
+                <RadioButton Content="Занятые" GroupName="RoomFilter" Tag="2" Checked="Filter_Checked"/>
+            </StackPanel>
+
+            <!-- Живой поиск: справа от радиокнопок -->
+            <DockPanel Width="300" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" VerticalAlignment="Bottom"
+                                         Margin="0,0,8,8" Foreground="Gray"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         materialDesign:HintAssist.Hint="Поиск по номеру или гостю"
+                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
+            </DockPanel>
+        </Grid>
 
         <!-- Панель действий -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
             <Button Content="Заселить гостя" Style="{StaticResource MaterialDesignRaisedButton}" 
                     Click="CheckIn_Click" Margin="0,0,10,0" Width="150"/>
+            <Button Content="Забронировать" Style="{StaticResource MaterialDesignOutlinedButton}" 
+                    Click="Book_Click" Margin="0,0,10,0" Width="150"/>
             <Button Content="Выселить" Style="{StaticResource MaterialDesignOutlinedButton}" 
                     Click="CheckOut_Click" Margin="0,0,10,0" Width="150"/>
             <!-- НОВАЯ КНОПКА УБОРКИ -->
             <Button Content="Завершить уборку" Style="{StaticResource MaterialDesignOutlinedButton}" 
-                    Click="FinishCleaning_Click" Width="150"/>
+                    Click="FinishCleaning_Click" Margin="0,0,10,0" Width="150"/>
             <Button Content="Изменить цену" Style="{StaticResource MaterialDesignOutlinedButton}" 
                     Click="EditPrice_Click" Width="150"/>
         </StackPanel>
@@ -41,6 +54,7 @@
                     <DataGridTextColumn Header="Цена" Binding="{Binding BasePrice, StringFormat={}{0:N0} ₽}" Width="100"/>
                     <DataGridTextColumn Header="Гость" Binding="{Binding DisplayGuest}" Width="*"/>
                     <DataGridTextColumn Header="Даты" Binding="{Binding DateDisplay}" Width="150"/>
+                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingInfo}" Width="150"/>
                     <DataGridTemplateColumn Header="Статус" Width="120">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>

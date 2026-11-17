@@ -30,6 +30,8 @@ namespace HotelLogic {
         int nextBuildingId;
         int nextRoomId;
         int nextGuestId = 1;
+        int nextBookingId = 1;
+        double totalRevenue = 0.0;
 
     public:
         Hotel();
@@ -45,10 +47,17 @@ namespace HotelLogic {
         bool LoadFromFile(const std::string& filename);
         void UpdateRoomPrice(int roomId, double newPrice);
 
+        // Бронирование
+        bool BookRoom(int roomId, const std::string& guestName, const std::string& passport, const std::string& inDate, const std::string& outDate);
+
         // Поиск
         std::shared_ptr<Room> FindRoomById(int roomId);
         const std::vector<std::shared_ptr<Building>>& GetBuildings() const { return buildings; }
         std::vector<std::shared_ptr<Room>> GetAllRooms() const;
         const std::vector<std::shared_ptr<Guest>>& GetAllGuests() const { return allGuests; }
+
+        // Все бронирования и общая выручка
+        std::vector<std::shared_ptr<Booking>> GetAllBookings() const;
+        double GetTotalRevenue() const { return totalRevenue; }
     };
 }

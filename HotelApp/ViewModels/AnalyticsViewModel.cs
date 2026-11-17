@@ -16,6 +16,7 @@ namespace HotelApp.ViewModels
 		public int CleaningRooms { get; private set; }
 		public int TotalGuests { get; private set; }
 		public double ExpectedRevenue { get; private set; }
+		public double TotalRevenue { get; private set; }
 		public double OccupancyPercent { get; private set; }
 
 		// Для цветного прогресс-бара
@@ -31,6 +32,7 @@ namespace HotelApp.ViewModels
 
 		public string OccupancyLabel => $"{OccupancyPercent:F0}%";
 		public string RevenueLabel => $"{ExpectedRevenue:N0} ₽";
+		public string TotalRevenueLabel => $"{TotalRevenue:N0} ₽";
 
 		public AnalyticsViewModel(IntPtr hotelPtr)
 		{
@@ -40,6 +42,12 @@ namespace HotelApp.ViewModels
 
 		public void Refresh()
 		{
+			// Сбрасываем счетчики, чтобы они не накапливались при повторном пересчете
+			FreeRooms = 0;
+			OccupiedRooms = 0;
+			CleaningRooms = 0;
+			ExpectedRevenue = 0;
+
 			// 1. Номера
 			var rooms = new CRoom[1000];
 			int count = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
@@ -70,6 +78,9 @@ namespace HotelApp.ViewModels
 
 			// 3. Процент загрузки
 			OccupancyPercent = TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
+
+			// 4. Общая выручка отеля (накопленная в C++ при выселении)
+			TotalRevenue = NativeMethods.Hotel_GetTotalRevenue(_hotelPtr);
 		}
 	}
 }

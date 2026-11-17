@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using HotelApp.Models;
 using HotelApp.Services;
 
@@ -7,7 +9,8 @@ namespace HotelApp.ViewModels
 {
 	public class MapViewModel
 	{
-		public ObservableCollection<RoomModel> Rooms { get; } = new ObservableCollection<RoomModel>();
+		// Номера, сгруппированные по корпусам
+		public ObservableCollection<BuildingMapModel> Buildings { get; } = new ObservableCollection<BuildingMapModel>();
 
 		public MapViewModel(IntPtr hotelPtr)
 		{
@@ -16,15 +19,25 @@ namespace HotelApp.ViewModels
 
 		public void Refresh(IntPtr hotelPtr)
 		{
+			// 1. Имена корпусов (BuildingId -> Название)
+			var bBuffer = new CBuilding[100];
+			int bCount = NativeMethods.Hotel_GetAllBuildings(hotelPtr, bBuffer, 100);
+
+			var buildingNames = new Dictionary<int, string>();
+			for (int i = 0; i < bCount; i++)
+				buildingNames[bBuffer[i].Id] = bBuffer[i].Name;
+
+			// 2. Все номера
 			var buffer = new CRoom[1000];
 			int count = NativeMethods.Hotel_GetAllRooms(hotelPtr, buffer, 1000);
 
-			Rooms.Clear();
+			var rooms = new List<RoomModel>(count);
 			for (int i = 0; i < count; i++)
 			{
-				Rooms.Add(new RoomModel
+				rooms.Add(new RoomModel
 				{
 					Id = buffer[i].Id,
+					BuildingId = buffer[i].BuildingId,
 					Number = buffer[i].Number,
 					Capacity = buffer[i].Capacity,
 					BasePrice = buffer[i].BasePrice,
@@ -33,6 +46,20 @@ namespace HotelApp.ViewModels
 					GuestName = buffer[i].GuestName,
 					CheckInDate = buffer[i].CheckInDate,
 					CheckOutDate = buffer[i].CheckOutDate
+				});
+			}
+
+			// 3. Группируем по корпусу через LINQ
+			Buildings.Clear();
+			foreach (var group in rooms.GroupBy(r => r.BuildingId).OrderBy(g => g.Key))
+			{
+				Buildings.Add(new BuildingMapModel
+				{
+					BuildingId = group.Key,
+					BuildingName = buildingNames.TryGetValue(group.Key, out string name)
+						? name
+						: $"Корпус {group.Key}",
+					Rooms = new ObservableCollection<RoomModel>(group)
 				});
 			}
 		}

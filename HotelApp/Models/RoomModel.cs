@@ -7,6 +7,7 @@ namespace HotelApp.Models
 	public class RoomModel : INotifyPropertyChanged
 	{
 		private int _id;
+		private int _buildingId;
 		private string _number;
 		private int _capacity;
 		private double _basePrice;
@@ -15,9 +16,20 @@ namespace HotelApp.Models
 		private string _guestName;
 
 		public int Id { get => _id; set { _id = value; OnPropertyChanged(); } }
+		public int BuildingId { get => _buildingId; set { _buildingId = value; OnPropertyChanged(); } }
 		public string Number { get => _number; set { _number = value; OnPropertyChanged(); } }
 		public int Capacity { get => _capacity; set { _capacity = value; OnPropertyChanged(); } }
-		public double BasePrice { get => _basePrice; set { _basePrice = value; OnPropertyChanged(); } }
+
+		public double BasePrice
+		{
+			get => _basePrice;
+			set
+			{
+				_basePrice = value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(PriceLabel));
+			}
+		}
 
 		public int Status
 		{
@@ -31,7 +43,17 @@ namespace HotelApp.Models
 			}
 		}
 
-		public int Type { get => _type; set { _type = value; OnPropertyChanged(); OnPropertyChanged(nameof(TypeText)); } }
+		public int Type
+		{
+			get => _type;
+			set
+			{
+				_type = value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(TypeText));
+				OnPropertyChanged(nameof(IsLux));
+			}
+		}
 
 		public string GuestName
 		{
@@ -67,6 +89,11 @@ namespace HotelApp.Models
 
 		public string DisplayGuest => string.IsNullOrEmpty(GuestName) ? "—" : GuestName;
 
+		// Используется на карте отеля для "звездочки" у люксов
+		public bool IsLux => Type == 1;
+
+		public string PriceLabel => $"{BasePrice:N0} ₽";
+
 		public Brush StatusColor
 		{
 			get
@@ -90,5 +117,12 @@ namespace HotelApp.Models
 		public string CheckOutDate { get => _checkOutDate; set { _checkOutDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(DateDisplay)); } }
 
 		public string DateDisplay => string.IsNullOrEmpty(CheckInDate) ? "—" : $"{CheckInDate} - {CheckOutDate}";
+
+		private string _bookingInfo = "—";
+		public string BookingInfo
+		{
+			get => _bookingInfo;
+			set { _bookingInfo = value; OnPropertyChanged(); }
+		}
 	}
 }

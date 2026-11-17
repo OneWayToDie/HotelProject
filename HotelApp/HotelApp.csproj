@@ -69,6 +69,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Models\BookingModel.cs" />
+    <Compile Include="Models\BuildingMapModel.cs" />
     <Compile Include="Models\BuildingModels.cs" />
     <Compile Include="Models\GuestModel.cs" />
     <Compile Include="Models\LogEntry.cs" />
