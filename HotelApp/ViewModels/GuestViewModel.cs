@@ -19,7 +19,6 @@ namespace HotelApp.ViewModels
 
 		public ObservableCollection<GuestModel> Guests { get; } = new ObservableCollection<GuestModel>();
 
-		// Строка живого поиска (без кнопки "Найти")
 		public string SearchText
 		{
 			get => _searchText;
@@ -41,10 +40,7 @@ namespace HotelApp.ViewModels
 
 		public void RefreshData()
 		{
-			try
-			{
-				LoadGuests();
-			}
+			try { LoadGuests(); }
 			catch (Exception ex)
 			{
 				_mainVm.AddLog("База гостей: не удалось загрузить данные. " + ex.Message, LogType.Error);
@@ -58,51 +54,218 @@ namespace HotelApp.ViewModels
 			var buffer = new CGuest[max];
 			int count = NativeMethods.Hotel_GetAllGuests(_hotelPtr, buffer, max);
 
-			// Проживание и брони показываем отдельными колонками
-			var stays = BuildStays(onlyBookings: false);
-			var bookings = BuildStays(onlyBookings: true);
+			// 1. Справочник номеров: roomId -> (buildingName, roomNumber, basePrice)
+			var roomInfo = new Dictionary<int, (string Building, string Number, double Price)>();
+			var rooms = new CRoom[max];
+			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, max);
+			var buildings = new Dictionary<int, string>();
+			var bBuffer = new CBuilding[100];
+			int bCount = NativeMethods.Hotel_GetAllBuildings(_hotelPtr, bBuffer, 100);
+			for (int i = 0; i < bCount; i++) buildings[bBuffer[i].Id] = bBuffer[i].Name;
 
+			for (int i = 0; i < roomCount; i++)
+			{
+				string bName = buildings.TryGetValue(rooms[i].BuildingId, out string n) ? n : $"Корпус {rooms[i].BuildingId}";
+				roomInfo[rooms[i].Id] = (bName, rooms[i].Number, rooms[i].BasePrice);
+			}
+
+			// 2. Собираем историю по каждому гостю (проживания + брони)
+			var historyByGuest = BuildHistory(roomInfo);
+
+			// 3. Фильтр и формирование GuestModel
 			string search = (SearchText ?? string.Empty).Trim().ToLower();
-
 			Guests.Clear();
 			int rowNumber = 0;
+
 			for (int i = 0; i < count; i++)
 			{
-				// ПРИМЕНЯЕМ ПОИСК (по ФИО и паспорту, без учета регистра)
 				if (search.Length > 0)
 				{
 					string fullName = (buffer[i].FullName ?? string.Empty).ToLower();
 					string passport = (buffer[i].Passport ?? string.Empty).ToLower();
-
 					if (!fullName.Contains(search) && !passport.Contains(search)) continue;
 				}
-
 				rowNumber++;
 
-				string key = StayKey(buffer[i].FullName, buffer[i].Passport);
-				stays.TryGetValue(key ?? string.Empty, out List<StayRange> guestStays);
-				bookings.TryGetValue(key ?? string.Empty, out List<StayRange> guestBookings);
+				string key = StayKey(buffer[i].FullName, buffer[i].Passport) ?? string.Empty;
+				var history = historyByGuest.TryGetValue(key, out var list)
+					? list
+					: new List<StayHistoryItem>();
 
-				Guests.Add(new GuestModel
+				// Сортируем по дате заезда
+				history = history.OrderBy(h => h.CheckIn).ToList();
+
+				var guest = new GuestModel
 				{
 					Id = buffer[i].Id,
 					RowNumber = rowNumber,
 					FullName = buffer[i].FullName,
-					Passport = buffer[i].Passport,
-					StayDisplay = FormatNearest(guestStays),
-					StayToolTip = BuildStayToolTip(guestStays, "Все проживания:"),
-					BookingDisplay = FormatNearest(guestBookings),
-					BookingToolTip = BuildStayToolTip(guestBookings, "Все брони:")
-				});
+					Passport = buffer[i].Passport
+				};
+
+				// Агрегация
+				int totalDays = 0;
+				double totalRevenue = 0;
+				foreach (var h in history)
+				{
+					totalDays += h.Days;
+					totalRevenue += h.Revenue;
+					guest.StayHistory.Add(h);
+				}
+
+				guest.TotalDays = totalDays;
+				guest.TotalRevenue = totalRevenue;
+				guest.LastRoomInfo = ComputeLastRoomInfo(history);
+
+				// Старые свойства (для совместимости, если где-то используются)
+				var nearest = PickNearest(history);
+				guest.StayDisplay = nearest != null
+					? $"{nearest.CheckIn:dd.MM.yyyy} — {nearest.CheckOut:dd.MM.yyyy}"
+					: "—";
+
+				Guests.Add(guest);
 			}
 		}
 
-		// Удаление гостя из базы. Id не смещаются: запись просто исчезает,
-		// а номера строк в таблице пересчитываются в RefreshData.
+		// Собирает историю проживаний и броней по ключу гостя
+		private Dictionary<string, List<StayHistoryItem>> BuildHistory(
+			Dictionary<int, (string Building, string Number, double Price)> roomInfo)
+		{
+			var result = new Dictionary<string, List<StayHistoryItem>>(StringComparer.OrdinalIgnoreCase);
+			var today = DateTime.Today;
+			var todayStr = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+			// 1. Текущие проживания (статус = 1)
+			var rooms = new CRoom[1000];
+			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
+			for (int i = 0; i < roomCount; i++)
+			{
+				if (rooms[i].Status != 1) continue;
+				var key = StayKey(rooms[i].GuestName, rooms[i].GuestPassport);
+				if (string.IsNullOrEmpty(key)) continue;
+				if (!roomInfo.TryGetValue(rooms[i].Id, out var info)) continue;
+
+				if (!DateTime.TryParse(rooms[i].CheckInDate, out var cin)) continue;
+				if (!DateTime.TryParse(rooms[i].CheckOutDate, out var cout)) continue;
+				int days = (cout.Date - cin.Date).Days;
+				if (days <= 0) days = 1;
+
+				AddHistory(result, key, new StayHistoryItem
+				{
+					RoomId = rooms[i].Id,
+					CheckIn = cin,
+					CheckOut = cout,
+					Days = days,
+					BuildingName = info.Building,
+					RoomNumber = info.Number,
+					Revenue = info.Price * days,
+					Status = StayStatus.Current
+				});
+			}
+
+			// 2. Бронирования (все, включая будущие)
+			var bookings = new CBooking[1000];
+			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
+			for (int i = 0; i < bookingCount; i++)
+			{
+				var key = StayKey(bookings[i].GuestName, bookings[i].Passport);
+				if (string.IsNullOrEmpty(key)) continue;
+				if (!roomInfo.TryGetValue(bookings[i].RoomId, out var info)) continue;
+
+				if (!DateTime.TryParse(bookings[i].CheckInDate, out var cin)) continue;
+				if (!DateTime.TryParse(bookings[i].CheckOutDate, out var cout)) continue;
+				int days = (cout.Date - cin.Date).Days;
+				if (days <= 0) days = 1;
+
+				// Определяем статус
+				StayStatus status;
+				if (cin.Date <= today && cout.Date > today)
+					status = StayStatus.Current; // бронь, которая уже идёт (гость заселен)
+				else if (cin.Date > today)
+					status = StayStatus.Booking; // будущая
+				else
+					status = StayStatus.Past;    // прошедшая (редко, но бывает)
+
+				AddHistory(result, key, new StayHistoryItem
+				{
+					RoomId = bookings[i].RoomId,
+					CheckIn = cin,
+					CheckOut = cout,
+					Days = days,
+					BuildingName = info.Building,
+					RoomNumber = info.Number,
+					Revenue = info.Price * days,
+					Status = status
+				});
+			}
+
+			return result;
+		}
+
+		// Добавляет запись, защищая от дубликатов по (roomId, checkIn, checkOut)
+		private static void AddHistory(
+			Dictionary<string, List<StayHistoryItem>> dict,
+			string key, StayHistoryItem item)
+		{
+			if (!dict.TryGetValue(key, out var list))
+			{
+				list = new List<StayHistoryItem>();
+				dict[key] = list;
+			}
+			// Дубликат: тот же номер и те же даты
+			if (list.Any(h => h.RoomId == item.RoomId
+				&& h.CheckIn.Date == item.CheckIn.Date
+				&& h.CheckOut.Date == item.CheckOut.Date))
+				return;
+			list.Add(item);
+		}
+
+		// Вычисляет LastRoomInfo по правилу: текущий > ближайшая бронь > последний прошлый > "—"
+		private static string ComputeLastRoomInfo(List<StayHistoryItem> history)
+		{
+			if (history == null || history.Count == 0) return "—";
+
+			// Приоритет 1: текущее проживание
+			var current = history.FirstOrDefault(h => h.Status == StayStatus.Current);
+			if (current != null)
+				return $"{current.BuildingName}, {current.RoomNumber}";
+
+			// Приоритет 2: ближайшая будущая бронь
+			var booking = history
+				.Where(h => h.Status == StayStatus.Booking)
+				.OrderBy(h => h.CheckIn)
+				.FirstOrDefault();
+			if (booking != null)
+				return $"{booking.BuildingName}, {booking.RoomNumber} (бронь)";
+
+			// Приоритет 3: последний завершённый
+			var past = history
+				.Where(h => h.Status == StayStatus.Past)
+				.OrderByDescending(h => h.CheckOut)
+				.FirstOrDefault();
+			if (past != null)
+				return $"{past.BuildingName}, {past.RoomNumber}";
+
+			return "—";
+		}
+
+		// Ближайшее проживание для старого StayDisplay
+		private static StayHistoryItem PickNearest(List<StayHistoryItem> list)
+		{
+			if (list == null || list.Count == 0) return null;
+			var today = DateTime.Today;
+			var ordered = list.OrderBy(h => h.CheckIn).ToList();
+			foreach (var h in ordered)
+				if (h.CheckIn.Date <= today && h.CheckOut.Date > today) return h;
+			foreach (var h in ordered)
+				if (h.CheckIn.Date > today) return h;
+			return ordered[ordered.Count - 1];
+		}
+
+		// Удаление гостя (без изменений)
 		public bool DeleteGuest(GuestModel guest)
 		{
 			if (guest == null) return false;
-
 			try
 			{
 				string roomNumber = FindStayingRoomNumber(guest);
@@ -113,14 +276,12 @@ namespace HotelApp.ViewModels
 						"Удаление гостя");
 					return false;
 				}
-
 				if (!NativeMethods.Hotel_DeleteGuest(_hotelPtr, guest.Id))
 				{
 					_mainVm.AddLog($"Удаление гостя {guest.FullName} не выполнено.", LogType.Error);
 					AppDialog.Warning("Не удалось удалить гостя.", "Удаление гостя");
 					return false;
 				}
-
 				RefreshData();
 				_mainVm.AddLog($"Удалён гость: {guest.FullName} (паспорт: {guest.Passport}).", LogType.Success);
 				_mainVm.SaveData();
@@ -134,19 +295,16 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Номер, в котором сейчас проживает гость (null — не проживает)
 		public string FindStayingRoomNumber(GuestModel guest)
 		{
 			if (guest == null) return null;
-
 			string key = StayKey(guest.FullName, guest.Passport);
 			if (key == null) return null;
-
 			var rooms = new CRoom[1000];
 			int count = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
 			for (int i = 0; i < count; i++)
 			{
-				if (rooms[i].Status != 1) continue; // 1 = занят
+				if (rooms[i].Status != 1) continue;
 				if (!string.Equals(StayKey(rooms[i].GuestName, rooms[i].GuestPassport), key,
 						StringComparison.OrdinalIgnoreCase)) continue;
 				return rooms[i].Number;
@@ -154,60 +312,6 @@ namespace HotelApp.ViewModels
 			return null;
 		}
 
-		private Dictionary<string, List<StayRange>> BuildStays(bool onlyBookings)
-		{
-			var stays = new Dictionary<string, List<StayRange>>(StringComparer.OrdinalIgnoreCase);
-
-			if (!onlyBookings)
-			{
-				var rooms = new CRoom[1000];
-				int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
-				for (int i = 0; i < roomCount; i++)
-				{
-					if (rooms[i].Status != 1) continue;
-					AddStay(stays, StayKey(rooms[i].GuestName, rooms[i].GuestPassport),
-						rooms[i].CheckInDate, rooms[i].CheckOutDate);
-				}
-			}
-
-			var bookings = new CBooking[1000];
-			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
-			for (int i = 0; i < bookingCount; i++)
-			{
-				AddStay(stays, StayKey(bookings[i].GuestName, bookings[i].Passport),
-					bookings[i].CheckInDate, bookings[i].CheckOutDate);
-			}
-
-			return stays;
-		}
-
-		private static string FormatNearest(List<StayRange> list)
-		{
-			var nearest = PickNearest(list);
-			return nearest == null
-				? "—"
-				: $"{FormatDate(nearest.CheckIn)} — {FormatDate(nearest.CheckOut)}";
-		}
-
-		private static void AddStay(Dictionary<string, List<StayRange>> stays, string key,
-			string checkIn, string checkOut)
-		{
-			if (string.IsNullOrEmpty(key) ||
-				string.IsNullOrWhiteSpace(checkIn) || string.IsNullOrWhiteSpace(checkOut)) return;
-
-			if (!stays.TryGetValue(key, out List<StayRange> list))
-			{
-				list = new List<StayRange>();
-				stays[key] = list;
-			}
-
-			// Одна и та же поездка может быть и в номере, и в брони
-			if (list.Any(s => s.CheckIn == checkIn && s.CheckOut == checkOut)) return;
-
-			list.Add(new StayRange { CheckIn = checkIn, CheckOut = checkOut });
-		}
-
-		// Ключ сопоставления гостя с заселением/бронью: паспорт, а при его отсутствии — ФИО
 		private static string StayKey(string name, string passport)
 		{
 			if (!string.IsNullOrWhiteSpace(passport)) return "P:" + passport.Trim().ToUpperInvariant();
@@ -215,53 +319,8 @@ namespace HotelApp.ViewModels
 			return null;
 		}
 
-		// Самое близкое проживание: текущее, затем ближайшее будущее, иначе последнее прошедшее
-		private static StayRange PickNearest(List<StayRange> list)
-		{
-			if (list == null || list.Count == 0) return null;
-
-			string today = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-			var ordered = list.OrderBy(s => s.CheckIn, StringComparer.Ordinal).ToList();
-
-			foreach (var stay in ordered)
-				if (string.CompareOrdinal(stay.CheckIn, today) <= 0 &&
-					string.CompareOrdinal(today, stay.CheckOut) < 0)
-					return stay;
-
-			foreach (var stay in ordered)
-				if (string.CompareOrdinal(stay.CheckIn, today) > 0)
-					return stay;
-
-			return ordered[ordered.Count - 1];
-		}
-
-		private static string BuildStayToolTip(List<StayRange> list, string header)
-		{
-			if (list == null || list.Count < 2) return null;
-
-			var ordered = list.OrderBy(s => s.CheckIn, StringComparer.Ordinal);
-			return header + "\n" + string.Join("\n",
-				ordered.Select(s => $"{FormatDate(s.CheckIn)} — {FormatDate(s.CheckOut)}"));
-		}
-
-		private static string FormatDate(string iso)
-		{
-			if (DateTime.TryParseExact(iso, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-					DateTimeStyles.None, out DateTime date))
-				return date.ToString("dd.MM.yyyy");
-			return iso;
-		}
-
-		private sealed class StayRange
-		{
-			public string CheckIn;
-			public string CheckOut;
-		}
-
 		public event PropertyChangedEventHandler PropertyChanged;
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
-		{
-			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-		}
+			=> PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 	}
 }

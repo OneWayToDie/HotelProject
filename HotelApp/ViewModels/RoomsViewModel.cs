@@ -96,7 +96,9 @@ namespace HotelApp.ViewModels
 					BasePrice = rBuffer[i].BasePrice,
 					Status = rBuffer[i].Status,
 					Type = rBuffer[i].Type,
-					GuestName = rBuffer[i].GuestName
+					GuestName = rBuffer[i].GuestName,
+					CheckInDate = rBuffer[i].CheckInDate,
+					CheckOutDate = rBuffer[i].CheckOutDate
 				});
 			}
 			_mainVm.UpdateStats(); // Обновляем цифры в шапке
@@ -119,13 +121,31 @@ namespace HotelApp.ViewModels
 				});
 			}
 
-			// Показываем ближайшую бронь в таблице номеров
+			// Показываем бронь в таблице номеров и подсвечиваем ожидающих заезда
+			string todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+
 			foreach (var room in Rooms)
 			{
-				var booking = Bookings.Where(b => b.RoomId == room.Id)
-									  .OrderBy(b => b.CheckInDate)
-									  .FirstOrDefault();
-				room.BookingInfo = booking != null ? booking.DateDisplay : "—";
+				// Ищем бронь, которая начинается сегодня или уже идет
+				var activeBooking = Bookings.FirstOrDefault(b => b.RoomId == room.Id
+					&& string.Compare(b.CheckInDate, todayStr) <= 0
+					&& string.Compare(b.CheckOutDate, todayStr) > 0);
+
+				if (activeBooking != null)
+				{
+					room.BookingInfo = $"⚠️ Ждет заселения: {activeBooking.GuestName}";
+					room.IsWaitingForCheckIn = true;
+				}
+				else
+				{
+					// Если нет активной брони на сегодня, показываем ближайшую будущую
+					var booking = Bookings.Where(b => b.RoomId == room.Id)
+										  .OrderBy(b => b.CheckInDate)
+										  .FirstOrDefault();
+
+					room.BookingInfo = booking != null ? booking.DateDisplay : "—";
+					room.IsWaitingForCheckIn = false;
+				}
 			}
 		}
 

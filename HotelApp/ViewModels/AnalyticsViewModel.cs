@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using HotelApp.Services;
+using LiveCharts;
+using LiveCharts.Wpf;
 
 namespace HotelApp.ViewModels
 {
@@ -12,7 +15,7 @@ namespace HotelApp.ViewModels
 	{
 		private IntPtr _hotelPtr;
 
-		// Данные для карточек
+		// --- Данные для карточек ---
 		public int TotalRooms { get; private set; }
 		public int FreeRooms { get; private set; }
 		public int OccupiedRooms { get; private set; }
@@ -22,7 +25,6 @@ namespace HotelApp.ViewModels
 		public double TotalRevenue { get; private set; }
 		public double OccupancyPercent { get; private set; }
 
-		// Для цветного прогресс-бара
 		public Brush OccupancyColor
 		{
 			get
@@ -32,32 +34,43 @@ namespace HotelApp.ViewModels
 				return Brushes.MediumSeaGreen;
 			}
 		}
-
 		public string OccupancyLabel => $"{OccupancyPercent:F0}%";
 		public string RevenueLabel => $"{ExpectedRevenue:N0} ₽";
 		public string TotalRevenueLabel => $"{TotalRevenue:N0} ₽";
 
+		// --- Данные для графиков ---
+		public SeriesCollection RevenueSeries { get; set; }
+		public SeriesCollection OccupancySeries { get; set; }
+		public SeriesCollection RoomTypeSeries { get; set; }
+		public string[] MonthLabels { get; set; }
+		public Func<double, string> YFormatterRevenue { get; set; }
+		public Func<double, string> YFormatterCount { get; set; }
+
 		public AnalyticsViewModel(IntPtr hotelPtr)
 		{
 			_hotelPtr = hotelPtr;
+
+			// Инициализация коллекций для графиков
+			RevenueSeries = new SeriesCollection();
+			OccupancySeries = new SeriesCollection();
+			RoomTypeSeries = new SeriesCollection();
+			MonthLabels = new string[0];
+
+			YFormatterRevenue = value => value.ToString("N0") + " ₽";
+			YFormatterCount = value => value.ToString("N0");
+
 			Refresh();
 		}
 
 		public void Refresh()
 		{
-			try
-			{
-				Recalculate();
-			}
-			catch (Exception ex)
-			{
-				AppDialog.Error("Не удалось рассчитать аналитику.\n" + ex.Message, "Аналитика");
-			}
+			try { Recalculate(); }
+			catch (Exception ex) { AppDialog.Error("Не удалось рассчитать аналитику.\n" + ex.Message, "Аналитика"); }
 		}
 
 		private void Recalculate()
 		{
-			// Сбрасываем счетчики, чтобы они не накапливались при повторном пересчете
+			// Сбрасываем счетчики
 			FreeRooms = 0;
 			OccupiedRooms = 0;
 			CleaningRooms = 0;
@@ -68,38 +81,36 @@ namespace HotelApp.ViewModels
 			int count = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
 			TotalRooms = count;
 
-			// Нужно для расчета цены броней (цена хранится в номере)
 			var roomsById = new Dictionary<int, CRoom>();
-
 			for (int i = 0; i < count; i++)
 			{
 				var r = rooms[i];
 				roomsById[r.Id] = r;
-
 				if (r.Status == 0) FreeRooms++;
 				else if (r.Status == 1)
 				{
 					OccupiedRooms++;
-
-					// Считаем выручку по текущим заселениям (цена за сутки x число суток)
+					// Выручка по текущим заселениям
 					if (TryGetStayRevenue(r, out double stayRevenue))
 						ExpectedRevenue += stayRevenue;
 				}
 				else if (r.Status == 2) CleaningRooms++;
 			}
 
-			// 2. Бронирования (их создает в том числе импорт Excel)
-			// Берем только незавершенные брони: они еще принесут деньги.
+			// 2. Бронирования
 			DateTime today = DateTime.Today;
 			var bookings = new CBooking[1000];
 			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
 
+			// Словари для графиков
+			var revenueByMonth = new Dictionary<string, double>();
+			var countByMonth = new Dictionary<string, int>();
+			var typeCounts = new Dictionary<string, int> { { "Стандарт", 0 }, { "Люкс", 0 }, { "Конференц-зал", 0 } };
+
 			for (int i = 0; i < bookingCount; i++)
 			{
 				var booking = bookings[i];
-
 				if (!roomsById.TryGetValue(booking.RoomId, out var room)) continue;
-
 				if (!DateTime.TryParse(booking.CheckInDate, out var bookingIn) ||
 					!DateTime.TryParse(booking.CheckOutDate, out var bookingOut))
 					continue;
@@ -118,43 +129,87 @@ namespace HotelApp.ViewModels
 					bookingIn.Date < stayOut.Date && stayIn.Date < bookingOut.Date)
 					continue;
 
+				// Добавляем в ожидаемую выручку
 				ExpectedRevenue += room.BasePrice * days;
+
+				// Данные для графиков
+				string monthLabel = bookingIn.ToString("MMM yyyy", new CultureInfo("ru-RU"));
+				double revenue = room.BasePrice * days;
+
+				if (!revenueByMonth.ContainsKey(monthLabel))
+				{
+					revenueByMonth[monthLabel] = 0;
+					countByMonth[monthLabel] = 0;
+				}
+
+				revenueByMonth[monthLabel] += revenue;
+				countByMonth[monthLabel] += 1;
+
+				// Подсчет типов номеров
+				string typeName = room.Type == 1 ? "Люкс" : (room.Type == 2 ? "Конференц-зал" : "Стандарт");
+				if (typeCounts.ContainsKey(typeName)) typeCounts[typeName]++;
 			}
 
-			// 3. Гости
+			// 3. Сортируем месяцы по дате
+			var sortedMonths = revenueByMonth.Keys
+				.OrderBy(k => DateTime.ParseExact("01 " + k, "dd MMM yyyy", new CultureInfo("ru-RU")))
+				.ToArray();
+			MonthLabels = sortedMonths;
+
+			// 4. Формируем данные для графиков
+			RevenueSeries = new SeriesCollection
+			{
+				new ColumnSeries
+				{
+					Title = "Выручка",
+					Values = new ChartValues<double>(sortedMonths.Select(m => revenueByMonth[m])),
+					Fill = (Brush)System.Windows.Application.Current.FindResource("PrimaryHueMidBrush")
+				}
+			};
+
+			OccupancySeries = new SeriesCollection
+			{
+				new ColumnSeries
+				{
+					Title = "Кол-во броней",
+					Values = new ChartValues<double>(sortedMonths.Select(m => (double)countByMonth[m])),
+					Fill = (Brush)System.Windows.Application.Current.FindResource("SecondaryHueMidBrush")
+				}
+			};
+
+			RoomTypeSeries = new SeriesCollection
+			{
+				new PieSeries { Title = "Стандарт", Values = new ChartValues<double> { typeCounts["Стандарт"] }, DataLabels = true },
+				new PieSeries { Title = "Люкс", Values = new ChartValues<double> { typeCounts["Люкс"] }, DataLabels = true },
+				new PieSeries { Title = "Конференц-зал", Values = new ChartValues<double> { typeCounts["Конференц-зал"] }, DataLabels = true }
+			};
+
+			// 5. Гости
 			var guests = new CGuest[1000];
 			TotalGuests = NativeMethods.Hotel_GetAllGuests(_hotelPtr, guests, 1000);
 
-			// 4. Процент загрузки
+			// 6. Процент загрузки
 			OccupancyPercent = TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
 
-			// 5. Общая выручка отеля:
-			//    накопленная в C++ при выселении + ожидаемая от заселений и броней.
+			// 7. Общая выручка
 			TotalRevenue = NativeMethods.Hotel_GetTotalRevenue(_hotelPtr) + ExpectedRevenue;
 
-			// Обновляем все привязки: карточки должны меняться сразу после импорта,
-			// а не только при повторном открытии вкладки.
 			OnPropertyChanged(string.Empty);
 		}
 
-		// Выручка по текущему заселению: цена за сутки x число суток проживания.
 		private static bool TryGetStayRevenue(CRoom room, out double revenue)
 		{
 			revenue = 0;
-
 			if (!DateTime.TryParse(room.CheckInDate, out var dateIn) ||
 				!DateTime.TryParse(room.CheckOutDate, out var dateOut))
 				return false;
-
 			int days = (dateOut.Date - dateIn.Date).Days;
 			if (days <= 0) return false;
-
 			revenue = room.BasePrice * days;
 			return true;
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
-
 		private void OnPropertyChanged([CallerMemberName] string name = null)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

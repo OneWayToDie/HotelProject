@@ -81,6 +81,8 @@ namespace HotelLogic
             room->SetGuest(guestName, passport);
             room->SetBookingDates(inDate, outDate, days);
 
+            room->RemoveBookingByPassport(passport);
+
             // --- НОВОЕ: Добавляем гостя в базу, если его там еще нет ---
             bool exists = false;
             for (auto& g : allGuests) {

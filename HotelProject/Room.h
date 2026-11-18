@@ -48,6 +48,16 @@ namespace HotelLogic {
             currentGuestPassport = passport;
         }
 
+        // Удалить бронь по паспорту (когда гость заселяется)
+        void RemoveBookingByPassport(const std::string& passport) {
+            bookings.erase(
+                std::remove_if(bookings.begin(), bookings.end(),
+                    [&passport](const std::shared_ptr<Booking>& b) {
+                        return b->GetGuestPassport() == passport;
+                    }),
+                bookings.end());
+        }
+
         // Сеттеры
         void SetStatus(RoomStatus newStatus) { status = newStatus; }
 

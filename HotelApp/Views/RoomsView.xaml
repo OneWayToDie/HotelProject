@@ -58,7 +58,26 @@
                     <DataGridTextColumn Header="Цена" Binding="{Binding BasePrice, StringFormat={}{0:N0} ₽}" Width="100" MinWidth="90"/>
                     <DataGridTextColumn Header="Гость" Binding="{Binding DisplayGuest}" Width="190" MinWidth="160"/>
                     <DataGridTextColumn Header="Даты" Binding="{Binding DateDisplay}" Width="180" MinWidth="180"/>
-                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingInfo}" Width="*" MinWidth="220"/>
+                    <DataGridTemplateColumn Header="Бронь" Width="*" MinWidth="220">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding BookingInfo}" VerticalAlignment="Center" Margin="4,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                            <Style.Triggers>
+                                                <!-- Если гость ждет заезда, текст становится зеленым и жирным -->
+                                                <DataTrigger Binding="{Binding IsWaitingForCheckIn}" Value="True">
+                                                    <Setter Property="Foreground" Value="MediumSeaGreen"/>
+                                                    <Setter Property="FontWeight" Value="Bold"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="Статус" Width="120" MinWidth="110">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>

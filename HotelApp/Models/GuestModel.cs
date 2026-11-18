@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace HotelApp.Models
@@ -13,7 +14,6 @@ namespace HotelApp.Models
 		public string FullName { get => _fullName; set { _fullName = value; OnPropertyChanged(); } }
 		public string Passport { get => _passport; set { _passport = value; OnPropertyChanged(); } }
 
-		// Номер строки в текущем (отфильтрованном) списке. Пересчитывается после удаления.
 		private int _rowNumber;
 		public int RowNumber
 		{
@@ -21,31 +21,58 @@ namespace HotelApp.Models
 			set { _rowNumber = value; OnPropertyChanged(); }
 		}
 
-		// Ближайшее проживание: "01.12.2026 — 05.12.2026" или "—"
+		// --- НОВЫЕ СВОЙСТВА ДЛЯ АГРЕГАЦИИ ---
+
+		// Суммарное время проживания (все заезды + брони)
+		private int _totalDays;
+		public int TotalDays
+		{
+			get => _totalDays;
+			set { _totalDays = value; OnPropertyChanged(); }
+		}
+		public string TotalDaysDisplay => _totalDays > 0 ? $"{_totalDays} дн." : "—";
+
+		// Суммарная прибыль по гостю
+		private double _totalRevenue;
+		public double TotalRevenue
+		{
+			get => _totalRevenue;
+			set { _totalRevenue = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalRevenueDisplay)); }
+		}
+		public string TotalRevenueDisplay =>
+			_totalRevenue > 0 ? $"{_totalRevenue:N0} ₽" : "—";
+
+		// Последний/текущий номер (для основной строки)
+		private string _lastRoomInfo = "—";
+		public string LastRoomInfo
+		{
+			get => _lastRoomInfo;
+			set { _lastRoomInfo = value; OnPropertyChanged(); }
+		}
+
+		// Коллекция для RowDetails (раскрывающаяся панель)
+		public ObservableCollection<StayHistoryItem> StayHistory { get; }
+			= new ObservableCollection<StayHistoryItem>();
+
+		// --- СТАРЫЕ СВОЙСТВА (оставляем для совместимости, если где-то используются) ---
 		private string _stayDisplay = "—";
 		public string StayDisplay
 		{
 			get => _stayDisplay;
 			set { _stayDisplay = value; OnPropertyChanged(); }
 		}
-
-		// Полный список проживаний для всплывающей подсказки (null — подсказка не нужна)
 		private string _stayToolTip;
 		public string StayToolTip
 		{
 			get => _stayToolTip;
 			set { _stayToolTip = value; OnPropertyChanged(); }
 		}
-
-		// Ближайшая бронь: "01.12.2026 — 05.12.2026" или "—"
 		private string _bookingDisplay = "—";
 		public string BookingDisplay
 		{
 			get => _bookingDisplay;
 			set { _bookingDisplay = value; OnPropertyChanged(); }
 		}
-
-		// Полный список броней для всплывающей подсказки
 		private string _bookingToolTip;
 		public string BookingToolTip
 		{
@@ -55,8 +82,6 @@ namespace HotelApp.Models
 
 		public event PropertyChangedEventHandler PropertyChanged;
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
-		{
-			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-		}
+			=> PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 	}
 }

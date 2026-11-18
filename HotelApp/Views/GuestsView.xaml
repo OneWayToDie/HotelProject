@@ -32,11 +32,15 @@
                 Background="{DynamicResource MaterialDesignPaper}"
                 BorderBrush="{DynamicResource MaterialDesignDivider}"
                 BorderThickness="1">
+
+            <!-- Добавлен RowDetailsVisibilityMode="VisibleWhenSelected" для раскрытия по клику -->
             <DataGrid x:Name="GuestsGrid" ItemsSource="{Binding Guests}" AutoGenerateColumns="False" IsReadOnly="True"
-                      CanUserAddRows="False" HeadersVisibility="Column">
+                      CanUserAddRows="False" HeadersVisibility="Column" RowDetailsVisibilityMode="VisibleWhenSelected">
+
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="60" MinWidth="50"/>
-                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="*" MinWidth="220" MaxWidth="430">
+                    <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="Auto" MinWidth="50"/>
+
+                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="Auto" MinWidth="220" MaxWidth="430">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="ToolTip" Value="{Binding FullName}"/>
@@ -44,8 +48,10 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="200" MinWidth="160"/>
-                    <DataGridTextColumn Header="Даты проживания" Binding="{Binding StayDisplay}" Width="*" MinWidth="190">
+
+                    <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="Auto" MinWidth="110"/>
+                    <!-- ДАТА ПРОЖИВАНИЯ -->
+                    <DataGridTextColumn Header="Даты проживания" Binding="{Binding StayDisplay}" Width="Auto" MinWidth="190">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="ToolTip" Value="{Binding StayToolTip}"/>
@@ -53,7 +59,8 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingDisplay}" Width="*" MinWidth="190">
+
+                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingDisplay}" Width="Auto" MinWidth="160">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="ToolTip" Value="{Binding BookingToolTip}"/>
@@ -61,7 +68,142 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+
+                    <!-- НОВЫЙ СТОЛБЕЦ 1: Номер и корпус -->
+                    <DataGridTextColumn Header="Номер / Корпус" Binding="{Binding LastRoomInfo}" Width="Auto" MinWidth="210">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="4,2"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <!-- НОВЫЙ СТОЛБЕЦ 2: Время проживания -->
+                    <DataGridTextColumn Header="Время проживания" Binding="{Binding TotalDaysDisplay}" Width="Auto" MinWidth="155">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Padding" Value="4,2"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <!-- НОВЫЙ СТОЛБЕЦ 3: Прибыль -->
+                    <DataGridTextColumn Header="Прибыль" Binding="{Binding TotalRevenueDisplay}" Width="Auto" MinWidth="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Left"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Foreground" Value="#2E7D32"/>
+                                <!-- Зелёный цвет для денег -->
+                                <Setter Property="Padding" Value="8,2"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
+
+                <!-- РАСКРЫВАЮЩАЯСЯ ПАНЕЛЬ (ROW DETAILS) -->
+                <DataGrid.RowDetailsTemplate>
+                    <DataTemplate>
+                        <Border Background="#F5F7FA"
+                                BorderBrush="#E0E0E0"
+                                BorderThickness="0,1,0,0"
+                                Padding="16,12"
+                                Margin="0,0,0,8"
+                                CornerRadius="6">
+                            <StackPanel>
+                                <TextBlock Text="История взаимодействий"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                           Margin="0,0,0,10"/>
+
+                                <!-- Вложенная таблица истории -->
+                                <DataGrid ItemsSource="{Binding StayHistory}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          CanUserResizeRows="False"
+                                          HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal"
+                                          BorderThickness="0"
+                                          Background="Transparent"
+                                          RowBackground="Transparent"
+                                          AlternatingRowBackground="#FAFBFD"
+                                          MaxHeight="220"
+                                          FontSize="12">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Заезд" Binding="{Binding CheckInDisplay}" Width="Auto"/>
+                                        <DataGridTextColumn Header="Выезд" Binding="{Binding CheckOutDisplay}" Width="Auto"/>
+
+                                        <DataGridTextColumn Header="Дней" Binding="{Binding DaysDisplay}" Width="70">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+
+                                        <DataGridTextColumn Header="Корпус / Номер" Binding="{Binding RoomInfoDisplay}" Width="*"/>
+
+                                        <DataGridTextColumn Header="Сумма" Binding="{Binding RevenueDisplay}" Width="Auto">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+
+                                        <DataGridTemplateColumn Header="Статус" Width="180">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="12"
+                                                            Padding="14,5"
+                                                            HorizontalAlignment="Center"
+                                                            Background="{Binding StatusColor}">
+                                                        <!-- Ширина бейджа зависит от статуса -->
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <!-- По умолчанию — 150 (для "Бронь" и "Было") -->
+                                                                <Setter Property="Width" Value="150"/>
+                                                                <Style.Triggers>
+                                                                    <!-- Для "Проживает" — 180 -->
+                                                                    <DataTrigger Binding="{Binding StatusText}" Value="Проживает">
+                                                                        <Setter Property="Width" Value="180"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+
+                                                        <TextBlock Text="{Binding StatusText}"
+                                                                   Foreground="White"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Итоговая строка внутри панели -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                    <TextBlock Text="Итого: " FontWeight="SemiBold" FontSize="12" Foreground="Gray"/>
+                                    <TextBlock Text="{Binding TotalDaysDisplay}" FontWeight="Bold" FontSize="12" Margin="0,0,16,0"/>
+                                    <TextBlock Text="•" Foreground="Gray" Margin="0,0,16,0"/>
+                                    <TextBlock Text="{Binding TotalRevenueDisplay}" FontWeight="Bold" FontSize="12" Foreground="#2E7D32"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </DataGrid.RowDetailsTemplate>
+
             </DataGrid>
         </Border>
     </Grid>

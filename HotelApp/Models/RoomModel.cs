@@ -87,6 +87,13 @@ namespace HotelApp.Models
 			}
 		}
 
+		private bool _isWaitingForCheckIn;
+		public bool IsWaitingForCheckIn
+		{
+			get => _isWaitingForCheckIn;
+			set { _isWaitingForCheckIn = value; OnPropertyChanged(); }
+		}
+
 		public string DisplayGuest => string.IsNullOrEmpty(GuestName) ? "—" : GuestName;
 
 		// Используется на карте отеля для "звездочки" у люксов

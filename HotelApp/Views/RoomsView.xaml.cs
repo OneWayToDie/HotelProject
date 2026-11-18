@@ -1,6 +1,7 @@
 ﻿using System;
-using System.Windows;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using HotelApp.Models;
 using HotelApp.Services;
@@ -45,28 +46,59 @@ namespace HotelApp.Views
 		private async Task CheckInAsync()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
-			if (selectedRoom == null || selectedRoom.Status != 0) return;
+			if (selectedRoom == null || selectedRoom.Status != 0)
+			{
+				AppDialog.Warning("Выберите свободный номер!", "Заселение");
+				return;
+			}
 
 			var template = (DataTemplate)Application.Current.MainWindow.FindResource("CheckInDialogTemplate");
 			var dialogContent = template.LoadContent() as FrameworkElement;
+			var card = dialogContent as MaterialDesignThemes.Wpf.Card;
+			var panel = card?.Content as StackPanel;
+
+			// --- НОВОЕ: Ищем активную бронь на сегодня и подставляем данные ---
+			if (DataContext is RoomsViewModel vm && panel != null)
+			{
+				string todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+				var activeBooking = vm.Bookings.FirstOrDefault(b => b.RoomId == selectedRoom.Id
+					&& string.Compare(b.CheckInDate, todayStr) <= 0
+					&& string.Compare(b.CheckOutDate, todayStr) > 0);
+
+				if (activeBooking != null)
+				{
+					var nameBox = panel.Children[1] as TextBox;
+					var passportBox = panel.Children[2] as TextBox;
+					var inPicker = panel.Children[4] as DatePicker;
+					var outPicker = panel.Children[6] as DatePicker;
+
+					if (nameBox != null) nameBox.Text = activeBooking.GuestName;
+					if (passportBox != null) passportBox.Text = InputRules.FormatPassportDigits(activeBooking.Passport);
+
+					// Дата заезда - сегодня, дата выезда - из брони
+					if (inPicker != null) inPicker.SelectedDate = DateTime.Today;
+					if (outPicker != null && DateTime.TryParse(activeBooking.CheckOutDate, out var outDate))
+						outPicker.SelectedDate = outDate;
+				}
+			}
+			// -----------------------------------------------------------------
+
 			var result = await DialogHost.Show(dialogContent, "RootDialog");
 
 			if (result != null && result.ToString() == "True")
 			{
-				var card = dialogContent as MaterialDesignThemes.Wpf.Card;
-				var panel = card?.Content as StackPanel;
-				if (panel == null) return;
+				var nameBox = panel?.Children[1] as TextBox;
+				var passportBox = panel?.Children[2] as TextBox;
+				var inPicker = panel?.Children[4] as DatePicker;
+				var outPicker = panel?.Children[6] as DatePicker;
 
-				string guestName = (panel.Children[1] as TextBox)?.Text;
-				string passport = (panel.Children[2] as TextBox)?.Text;
-
-				// Достаем даты из DatePicker'ов
-				var dateIn = (panel.Children[4] as DatePicker)?.SelectedDate;
-				var dateOut = (panel.Children[6] as DatePicker)?.SelectedDate;
+				string guestName = nameBox?.Text;
+				string passport = passportBox?.Text;
+				var dateIn = inPicker?.SelectedDate;
+				var dateOut = outPicker?.SelectedDate;
 
 				if (!string.IsNullOrWhiteSpace(guestName) && dateIn.HasValue && dateOut.HasValue)
 				{
-					// Считаем разницу дней в C#
 					int days = (dateOut.Value - dateIn.Value).Days;
 					if (days <= 0)
 					{
@@ -74,10 +106,9 @@ namespace HotelApp.Views
 						return;
 					}
 
-					if (DataContext is RoomsViewModel vm)
+					if (DataContext is RoomsViewModel roomsVm)
 					{
-						// Логирование и обновление данных выполняет ViewModel
-						vm.CheckIn(selectedRoom.Id, guestName, passport ?? string.Empty,
+						roomsVm.CheckIn(selectedRoom.Id, guestName, passport ?? string.Empty,
 							dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"), days);
 					}
 				}

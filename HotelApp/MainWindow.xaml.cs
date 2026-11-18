@@ -409,19 +409,41 @@ namespace HotelApp
 			}
 		}
 
-		private static void RefreshCurrentView(MainViewModel vm)
+		// Принудительное обновление текущего экрана и шапки приложения
+		private void RefreshCurrentView(MainViewModel vm)
 		{
-			if (vm.CurrentView is RoomsViewModel roomsVm)
+			if (vm == null) return;
+
+			try
 			{
-				roomsVm.RefreshData();
-				return;
+				// 1. Всегда обновляем статистику в шапке (Всего, Свободно, Занято)
+				vm.UpdateStats();
+
+				// 2. Обновляем ту вкладку, которая сейчас открыта
+				if (vm.CurrentView is FrameworkElement view && view.DataContext != null)
+				{
+					if (view.DataContext is RoomsViewModel roomsVm)
+					{
+						roomsVm.RefreshData();
+					}
+					else if (view.DataContext is GuestsViewModel guestsVm)
+					{
+						guestsVm.RefreshData();
+					}
+					else if (view.DataContext is AnalyticsViewModel analyticsVm)
+					{
+						analyticsVm.Refresh();
+					}
+					else if (view.DataContext is MapViewModel mapVm)
+					{
+						mapVm.Refresh(vm.HotelPtr);
+					}
+				}
 			}
-
-			if (!(vm.CurrentView is FrameworkElement view)) return;
-
-			if (view.DataContext is GuestsViewModel guestsVm) guestsVm.RefreshData();
-			else if (view.DataContext is AnalyticsViewModel analyticsVm) analyticsVm.Refresh();
-			else if (view.DataContext is MapViewModel mapVm) mapVm.Refresh(vm.HotelPtr);
+			catch (Exception ex)
+			{
+				vm.AddLog($"Ошибка обновления экрана: {ex.Message}", LogType.Error);
+			}
 		}
 
 		// --- ФИЛЬТРЫ ВВОДА ---
