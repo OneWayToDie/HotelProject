@@ -33,6 +33,10 @@ namespace HotelLogic {
         int nextBookingId = 1;
         double totalRevenue = 0.0;
 
+        // Создать корпус/номер с заранее заданным Id (для загрузки из файла)
+        void AddBuildingWithId(int id, const std::string& name);
+        void AddRoomWithId(int id, int buildingId, int roomType, const std::string& roomNumber, double price);
+
     public:
         Hotel();
 
@@ -49,6 +53,12 @@ namespace HotelLogic {
 
         // Бронирование
         bool BookRoom(int roomId, const std::string& guestName, const std::string& passport, const std::string& inDate, const std::string& outDate);
+
+        // Удалить гостя из базы по Id (false — гость не найден)
+        bool DeleteGuest(int guestId);
+
+        // Полная очистка базы. Создаются два корпуса по умолчанию, Id начинаются с 1.
+        void ClearAll();
 
         // Поиск
         std::shared_ptr<Room> FindRoomById(int roomId);

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -50,6 +50,8 @@
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -73,17 +75,27 @@
     <Compile Include="Models\BuildingMapModel.cs" />
     <Compile Include="Models\BuildingModels.cs" />
     <Compile Include="Models\GuestModel.cs" />
+    <Compile Include="Models\ImportRow.cs" />
     <Compile Include="Models\LogEntry.cs" />
     <Compile Include="Models\RoomModel.cs" />
+    <Compile Include="Services\AppDialog.cs" />
+    <Compile Include="Services\ExcelImportService.cs" />
+    <Compile Include="Services\ExcelTemplate.cs" />
+    <Compile Include="Services\HotelImporter.cs" />
+    <Compile Include="Services\InputRules.cs" />
     <Compile Include="Services\NativeMethods.cs" />
+    <Compile Include="Services\XlsxFile.cs" />
     <Compile Include="ViewModels\AnalyticsViewModel.cs" />
     <Compile Include="ViewModels\GuestViewModel.cs" />
-    <Compile Include="ViewModels\HotelViewModel.cs" />
+    <Compile Include="ViewModels\ImportPreviewViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="ViewModels\MapViewModel.cs" />
     <Compile Include="ViewModels\RoomsViewModel.cs" />
     <Compile Include="Views\AnalyticsView.xaml.cs">
       <DependentUpon>AnalyticsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Dialogs\MessageDialog.xaml.cs">
+      <DependentUpon>MessageDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\GuestsView.xaml.cs">
       <DependentUpon>GuestsView.xaml</DependentUpon>
@@ -107,6 +119,10 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="Views\AnalyticsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Dialogs\MessageDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -149,6 +165,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Templates\Шаблон_гостей_20_чел.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

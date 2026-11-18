@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Windows;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 using HotelApp.Models;
+using HotelApp.Services;
 using HotelApp.ViewModels;
 using MaterialDesignThemes.Wpf;
 
@@ -30,6 +32,18 @@ namespace HotelApp.Views
 		// --- ЗАСЕЛЕНИЕ (без изменений, только добавили лог) ---
 		private async void CheckIn_Click(object sender, RoutedEventArgs e)
 		{
+			try
+			{
+				await CheckInAsync();
+			}
+			catch (Exception ex)
+			{
+				ReportError("заселение гостя", ex);
+			}
+		}
+
+		private async Task CheckInAsync()
+		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
 			if (selectedRoom == null || selectedRoom.Status != 0) return;
 
@@ -40,25 +54,31 @@ namespace HotelApp.Views
 			if (result != null && result.ToString() == "True")
 			{
 				var card = dialogContent as MaterialDesignThemes.Wpf.Card;
-				var panel = card.Content as StackPanel;
+				var panel = card?.Content as StackPanel;
+				if (panel == null) return;
 
-				string guestName = (panel.Children[1] as TextBox).Text;
-				string passport = (panel.Children[2] as TextBox).Text;
+				string guestName = (panel.Children[1] as TextBox)?.Text;
+				string passport = (panel.Children[2] as TextBox)?.Text;
 
 				// Достаем даты из DatePicker'ов
-				var dateIn = (panel.Children[4] as DatePicker).SelectedDate;
-				var dateOut = (panel.Children[6] as DatePicker).SelectedDate;
+				var dateIn = (panel.Children[4] as DatePicker)?.SelectedDate;
+				var dateOut = (panel.Children[6] as DatePicker)?.SelectedDate;
 
 				if (!string.IsNullOrWhiteSpace(guestName) && dateIn.HasValue && dateOut.HasValue)
 				{
 					// Считаем разницу дней в C#
 					int days = (dateOut.Value - dateIn.Value).Days;
-					if (days <= 0) { MessageBox.Show("Дата выезда должна быть позже заезда!"); return; }
+					if (days <= 0)
+					{
+						AppDialog.Warning("Дата выезда должна быть позже заезда!", "Заселение");
+						return;
+					}
 
 					if (DataContext is RoomsViewModel vm)
 					{
 						// Логирование и обновление данных выполняет ViewModel
-						vm.CheckIn(selectedRoom.Id, guestName, passport, dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"), days);
+						vm.CheckIn(selectedRoom.Id, guestName, passport ?? string.Empty,
+							dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"), days);
 					}
 				}
 			}
@@ -67,8 +87,20 @@ namespace HotelApp.Views
 		// --- БРОНИРОВАНИЕ ---
 		private async void Book_Click(object sender, RoutedEventArgs e)
 		{
+			try
+			{
+				await BookAsync();
+			}
+			catch (Exception ex)
+			{
+				ReportError("бронирование номера", ex);
+			}
+		}
+
+		private async Task BookAsync()
+		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
-			if (selectedRoom == null) { MessageBox.Show("Выберите номер!", "Бронирование", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+			if (selectedRoom == null) { AppDialog.Warning("Выберите номер!", "Бронирование"); return; }
 
 			var template = (DataTemplate)Application.Current.MainWindow.FindResource("BookingDialogTemplate");
 			var dialogContent = template.LoadContent() as FrameworkElement;
@@ -77,16 +109,17 @@ namespace HotelApp.Views
 			if (result != null && result.ToString() == "True")
 			{
 				var card = dialogContent as MaterialDesignThemes.Wpf.Card;
-				var panel = card.Content as StackPanel;
+				var panel = card?.Content as StackPanel;
+				if (panel == null) return;
 
-				string guestName = (panel.Children[1] as TextBox).Text;
-				string passport = (panel.Children[2] as TextBox).Text;
-				var dateIn = (panel.Children[4] as DatePicker).SelectedDate;
-				var dateOut = (panel.Children[6] as DatePicker).SelectedDate;
+				string guestName = (panel.Children[1] as TextBox)?.Text;
+				string passport = (panel.Children[2] as TextBox)?.Text;
+				var dateIn = (panel.Children[4] as DatePicker)?.SelectedDate;
+				var dateOut = (panel.Children[6] as DatePicker)?.SelectedDate;
 
 				if (!string.IsNullOrWhiteSpace(guestName) && dateIn.HasValue && dateOut.HasValue && DataContext is RoomsViewModel vm)
 				{
-					vm.BookRoom(selectedRoom.Id, guestName, passport,
+					vm.BookRoom(selectedRoom.Id, guestName, passport ?? string.Empty,
 						dateIn.Value.ToString("yyyy-MM-dd"), dateOut.Value.ToString("yyyy-MM-dd"));
 				}
 			}
@@ -94,8 +127,20 @@ namespace HotelApp.Views
 
 		private async void EditPrice_Click(object sender, RoutedEventArgs e)
 		{
+			try
+			{
+				await EditPriceAsync();
+			}
+			catch (Exception ex)
+			{
+				ReportError("изменение цены", ex);
+			}
+		}
+
+		private async Task EditPriceAsync()
+		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
-			if (selectedRoom == null) { MessageBox.Show("Выберите номер!"); return; }
+			if (selectedRoom == null) { AppDialog.Warning("Выберите номер!", "Изменение цены"); return; }
 
 			var template = (DataTemplate)Application.Current.MainWindow.FindResource("EditPriceDialogTemplate");
 			var dialogContent = template.LoadContent() as FrameworkElement;
@@ -104,10 +149,10 @@ namespace HotelApp.Views
 			if (result != null && result.ToString() == "True")
 			{
 				var card = dialogContent as MaterialDesignThemes.Wpf.Card;
-				var panel = card.Content as StackPanel;
-				var textBox = panel.Children[1] as TextBox;
+				var panel = card?.Content as StackPanel;
+				var textBox = panel?.Children[1] as TextBox;
 
-				if (textBox != null && double.TryParse(textBox.Text, out double newPrice))
+				if (textBox != null && InputRules.IsValidPrice(textBox.Text, out int newPrice))
 				{
 					if (DataContext is RoomsViewModel vm)
 					{
@@ -120,7 +165,7 @@ namespace HotelApp.Views
 					if (Application.Current.MainWindow.DataContext is MainViewModel mainVm)
 						mainVm.AddLog($"Номер {selectedRoom.Number}: цена не изменена (некорректный ввод).", LogType.Error);
 
-					MessageBox.Show("Не удалось распознать цену! Введите просто число, например: 3000");
+					AppDialog.Warning("Не удалось распознать цену! Введите целое число, например: 3000", "Изменение цены");
 				}
 			}
 		}
@@ -128,9 +173,21 @@ namespace HotelApp.Views
 		// --- ВЫСЕЛЕНИЕ (добавили лог) ---
 		private void CheckOut_Click(object sender, RoutedEventArgs e)
 		{
+			try
+			{
+				CheckOutCore();
+			}
+			catch (Exception ex)
+			{
+				ReportError("выселение гостя", ex);
+			}
+		}
+
+		private void CheckOutCore()
+		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
-			if (selectedRoom == null) { MessageBox.Show("Выберите номер!"); return; }
-			if (selectedRoom.Status != 1) { MessageBox.Show("Номер пуст!"); return; }
+			if (selectedRoom == null) { AppDialog.Warning("Выберите номер!", "Выселение"); return; }
+			if (selectedRoom.Status != 1) { AppDialog.Warning("Номер пуст!", "Выселение"); return; }
 
 			if (DataContext is RoomsViewModel vm)
 			{
@@ -142,12 +199,24 @@ namespace HotelApp.Views
 		// --- ЗАВЕРШЕНИЕ УБОРКИ ---
 		private void FinishCleaning_Click(object sender, RoutedEventArgs e)
 		{
+			try
+			{
+				FinishCleaningCore();
+			}
+			catch (Exception ex)
+			{
+				ReportError("завершение уборки", ex);
+			}
+		}
+
+		private void FinishCleaningCore()
+		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
-			if (selectedRoom == null) { MessageBox.Show("Выберите номер!"); return; }
+			if (selectedRoom == null) { AppDialog.Warning("Выберите номер!", "Уборка"); return; }
 
 			if (selectedRoom.Status != 2) // 2 = На уборке
 			{
-				MessageBox.Show("Этот номер не находится на уборке!", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+				AppDialog.Warning("Этот номер не находится на уборке!", "Ошибка");
 				return;
 			}
 
@@ -156,6 +225,15 @@ namespace HotelApp.Views
 				// Логирование и обновление данных выполняет ViewModel
 				vm.FinishCleaning(selectedRoom.Id);
 			}
+		}
+
+		// Единая обработка ошибок экрана «Номера и Фонд»
+		private void ReportError(string action, Exception ex)
+		{
+			if (Application.Current.MainWindow?.DataContext is MainViewModel mainVm)
+				mainVm.AddLog($"{action}: {ex.Message}", LogType.Error);
+
+			AppDialog.Error($"Не удалось выполнить действие «{action}».\n{ex.Message}", "Номера и Фонд");
 		}
 	}
 }

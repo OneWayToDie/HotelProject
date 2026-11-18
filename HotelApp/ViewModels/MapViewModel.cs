@@ -19,6 +19,18 @@ namespace HotelApp.ViewModels
 
 		public void Refresh(IntPtr hotelPtr)
 		{
+			try
+			{
+				LoadMap(hotelPtr);
+			}
+			catch (Exception ex)
+			{
+				AppDialog.Error("Не удалось построить карту отеля.\n" + ex.Message, "Карта отеля");
+			}
+		}
+
+		private void LoadMap(IntPtr hotelPtr)
+		{
 			// 1. Имена корпусов (BuildingId -> Название)
 			var bBuffer = new CBuilding[100];
 			int bCount = NativeMethods.Hotel_GetAllBuildings(hotelPtr, bBuffer, 100);

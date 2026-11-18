@@ -38,56 +38,98 @@ namespace HotelApp.ViewModels
 
 		public MainViewModel()
 		{
-			HotelPtr = NativeMethods.Hotel_Create();
-
-			// Пытаемся загрузить данные при старте
-			if (NativeMethods.Hotel_Load(HotelPtr, _dataFile))
+			try
 			{
-				AddLog("Данные успешно загружены из файла.");
+				HotelPtr = NativeMethods.Hotel_Create();
+
+				// Пытаемся загрузить данные при старте
+				if (NativeMethods.Hotel_Load(HotelPtr, _dataFile))
+				{
+					AddLog("Данные успешно загружены из файла.");
+				}
+				else
+				{
+					AddLog("Файл сохранения не найден. Создана новая база.");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				AddLog("Файл сохранения не найден. Создана новая база.");
+				AddLog("Не удалось открыть базу данных: " + ex.Message, LogType.Error);
+				AppDialog.Error("Не удалось открыть базу данных.\n" + ex.Message, "Запуск");
 			}
 
-			CurrentView = new RoomsViewModel(HotelPtr, this);
-			UpdateStats();
-			RefreshBuildings();
+			try
+			{
+				CurrentView = new RoomsViewModel(HotelPtr, this);
+				UpdateStats();
+				RefreshBuildings();
+			}
+			catch (Exception ex)
+			{
+				AddLog("Не удалось загрузить стартовый экран: " + ex.Message, LogType.Error);
+			}
 		}
 
 		// Обновить список корпусов для диалога добавления номера
 		public void RefreshBuildings()
 		{
-			var buffer = new CBuilding[100];
-			int count = NativeMethods.Hotel_GetAllBuildings(HotelPtr, buffer, 100);
-
-			Buildings.Clear();
-			for (int i = 0; i < count; i++)
+			try
 			{
-				Buildings.Add(new BuildingModel { Id = buffer[i].Id, Name = buffer[i].Name });
+				var buffer = new CBuilding[100];
+				int count = NativeMethods.Hotel_GetAllBuildings(HotelPtr, buffer, 100);
+
+				Buildings.Clear();
+				for (int i = 0; i < count; i++)
+				{
+					Buildings.Add(new BuildingModel { Id = buffer[i].Id, Name = buffer[i].Name });
+				}
+			}
+			catch (Exception ex)
+			{
+				AddLog("Не удалось обновить список корпусов: " + ex.Message, LogType.Error);
 			}
 		}
 
 		// МЕТОД ПЕРЕСЧЕТА СТАТИСТИКИ
 		public void UpdateStats()
 		{
-			var buffer = new CRoom[1000];
-			int count = NativeMethods.Hotel_GetAllRooms(HotelPtr, buffer, 1000);
-
-			int free = 0, occupied = 0;
-			for (int i = 0; i < count; i++)
+			try
 			{
-				if (buffer[i].Status == 0) free++; // 0 = Свободен
-				else if (buffer[i].Status == 1) occupied++; // 1 = Занят
-			}
+				var buffer = new CRoom[1000];
+				int count = NativeMethods.Hotel_GetAllRooms(HotelPtr, buffer, 1000);
 
-			TotalRooms = count;
-			FreeRooms = free;
-			OccupiedRooms = occupied;
+				int free = 0, occupied = 0;
+				for (int i = 0; i < count; i++)
+				{
+					if (buffer[i].Status == 0) free++; // 0 = Свободен
+					else if (buffer[i].Status == 1) occupied++; // 1 = Занят
+				}
+
+				TotalRooms = count;
+				FreeRooms = free;
+				OccupiedRooms = occupied;
+			}
+			catch (Exception ex)
+			{
+				AddLog("Не удалось пересчитать статистику: " + ex.Message, LogType.Error);
+			}
 		}
 
 		// Проверка: не заняты ли выбранные даты чужой бронью
 		public bool HasBookingConflict(int roomId, string inDate, string outDate, string guestName = null, string passport = null)
+		{
+			try
+			{
+				return CheckBookingConflict(roomId, inDate, outDate, guestName, passport);
+			}
+			catch (Exception ex)
+			{
+				AddLog("Не удалось проверить брони: " + ex.Message, LogType.Error);
+				return false;
+			}
+		}
+
+		private bool CheckBookingConflict(int roomId, string inDate, string outDate, string guestName, string passport)
 		{
 			var buffer = new CBooking[1000];
 			int count = NativeMethods.Hotel_GetAllBookings(HotelPtr, buffer, 1000);
@@ -135,8 +177,17 @@ namespace HotelApp.ViewModels
 
 		public void SaveData()
 		{
-			if (NativeMethods.Hotel_Save(HotelPtr, _dataFile))
-				AddLog("Данные сохранены в файл.");
+			try
+			{
+				if (NativeMethods.Hotel_Save(HotelPtr, _dataFile))
+					AddLog("Данные сохранены в файл.");
+				else
+					AddLog("Не удалось сохранить данные в файл.", LogType.Error);
+			}
+			catch (Exception ex)
+			{
+				AddLog("Ошибка сохранения данных: " + ex.Message, LogType.Error);
+			}
 		}
 	}
 }

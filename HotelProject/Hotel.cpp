@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 namespace HotelLogic 
 {
@@ -9,12 +10,32 @@ namespace HotelLogic
     Building::Building(int id, const std::string& name) : id(id), name(name) {}
 
     Hotel::Hotel() : nextBuildingId(1), nextRoomId(1) {
-        // Сразу создадим один корпус для теста
+        // Корпуса по умолчанию
         AddBuilding("Главный корпус");
+        AddBuilding("Корпус А");
     }
 
     void Hotel::AddBuilding(const std::string& name) {
         buildings.push_back(std::make_shared<Building>(nextBuildingId++, name));
+    }
+
+    void Hotel::AddBuildingWithId(int id, const std::string& name) {
+        buildings.push_back(std::make_shared<Building>(id, name));
+        if (id >= nextBuildingId) nextBuildingId = id + 1;
+    }
+
+    void Hotel::AddRoomWithId(int id, int buildingId, int roomType, const std::string& roomNumber, double price) {
+        for (auto& b : buildings) {
+            if (b->GetId() != buildingId) continue;
+            std::shared_ptr<Room> newRoom;
+            if (roomType == 1) newRoom = std::make_shared<LuxRoom>(id, roomNumber);
+            else if (roomType == 2) newRoom = std::make_shared<ConferenceRoom>(id, roomNumber);
+            else newRoom = std::make_shared<Room>(id, roomNumber, 2, price);
+            newRoom->SetPrice(price);
+            b->AddRoom(newRoom);
+            if (id >= nextRoomId) nextRoomId = id + 1;
+            return;
+        }
     }
 
     void Hotel::AddRoom(int buildingId, int roomType, const std::string& roomNumber, double price) {
@@ -115,6 +136,31 @@ namespace HotelLogic
         return true;
     }
 
+    void Hotel::ClearAll() {
+        buildings.clear();
+        allGuests.clear();
+        nextBuildingId = 1;
+        nextRoomId = 1;
+        nextGuestId = 1;
+        nextBookingId = 1;
+        totalRevenue = 0.0;
+
+        // База после очистки: два корпуса по умолчанию, Id начинаются с 1
+        AddBuilding("Главный корпус");
+        AddBuilding("Корпус А");
+    }
+
+    bool Hotel::DeleteGuest(int guestId) {
+        size_t before = allGuests.size();
+        allGuests.erase(
+            std::remove_if(allGuests.begin(), allGuests.end(),
+                [guestId](const std::shared_ptr<Guest>& guest) {
+                    return guest && guest->id == guestId;
+                }),
+            allGuests.end());
+        return allGuests.size() != before;
+    }
+
     std::vector<std::shared_ptr<Booking>> Hotel::GetAllBookings() const {
         std::vector<std::shared_ptr<Booking>> all;
         for (auto& b : buildings) {
@@ -206,8 +252,7 @@ namespace HotelLogic
                 try { id = std::stoi(idStr); }
                 catch (...) { continue; }
 
-                AddBuilding(name);
-                if (id >= nextBuildingId) nextBuildingId = id + 1;
+                AddBuildingWithId(id, name);
             }
             else if (type == "ROOM") {
                 std::string idStr, bIdStr, number, statusStr, typeName, priceStr, daysStr, guest, passport, inDate, outDate;
@@ -238,15 +283,14 @@ namespace HotelLogic
                 if (!daysStr.empty()) { try { days = std::stoi(daysStr); } catch (...) {} }
 
                 int roomType = (typeName == "Люкс") ? 1 : (typeName == "Конференц-зал" ? 2 : 0);
-                AddRoom(bId, roomType, number, price);
+                AddRoomWithId(id, bId, roomType, number, price);
 
-                auto room = FindRoomById(nextRoomId - 1);
+                auto room = FindRoomById(id);
                 if (room) {
                     room->SetStatus((RoomStatus)status);
                     room->SetGuest(guest, passport);
                     room->SetBookingDates(inDate, outDate, days);
                 }
-                if (id >= nextRoomId) nextRoomId = id + 1;
             }
             // ==========================================
             // НОВЫЙ БЛОК ДЛЯ ЧТЕНИЯ ГОСТЕЙ

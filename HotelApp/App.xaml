@@ -12,6 +12,32 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- ОБЩИЕ СТИЛИ ТАБЛИЦ -->
+            <!-- Ячейка без рамки фокуса: клик по строке выделяет строку, а не отдельный блок.
+                 Именно неявный стиль: DataGrid.CellStyle не перекрывает стиль ячейки по умолчанию. -->
+            <Style TargetType="{x:Type DataGridCell}"
+                   BasedOn="{StaticResource MaterialDesignDataGridCell}">
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            </Style>
+
+            <!-- Видимый разделитель между заголовками: за эту линию удобно тянуть ширину -->
+            <Style x:Key="HotelDataGridColumnHeader" TargetType="{x:Type DataGridColumnHeader}"
+                   BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
+                <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                <Setter Property="BorderBrush" Value="#4D000000"/>
+            </Style>
+
+            <!-- Общий стиль всех таблиц приложения -->
+            <Style TargetType="{x:Type DataGrid}" BasedOn="{StaticResource MaterialDesignDataGrid}">
+                <Setter Property="SelectionUnit" Value="FullRow"/>
+                <Setter Property="SelectionMode" Value="Single"/>
+                <Setter Property="GridLinesVisibility" Value="All"/>
+                <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                <Setter Property="ColumnHeaderStyle" Value="{StaticResource HotelDataGridColumnHeader}"/>
+            </Style>
+
             <!-- Учим WPF, какую View рисовать для какой ViewModel -->
             <DataTemplate DataType="{x:Type vm:RoomsViewModel}">
                 <views:RoomsView/>

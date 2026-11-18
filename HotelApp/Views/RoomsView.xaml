@@ -36,26 +36,30 @@
             <Button Content="Забронировать" Style="{StaticResource MaterialDesignOutlinedButton}" 
                     Click="Book_Click" Margin="0,0,10,0" Width="150"/>
             <Button Content="Выселить" Style="{StaticResource MaterialDesignOutlinedButton}" 
-                    Click="CheckOut_Click" Margin="0,0,10,0" Width="150"/>
+                    Click="CheckOut_Click" Margin="0,0,10,0" Width="110"/>
             <!-- НОВАЯ КНОПКА УБОРКИ -->
             <Button Content="Завершить уборку" Style="{StaticResource MaterialDesignOutlinedButton}" 
-                    Click="FinishCleaning_Click" Margin="0,0,10,0" Width="150"/>
+                    Click="FinishCleaning_Click" Margin="0,0,10,0" Width="190"/>
             <Button Content="Изменить цену" Style="{StaticResource MaterialDesignOutlinedButton}" 
                     Click="EditPrice_Click" Width="150"/>
         </StackPanel>
 
-        <!-- Таблица (остается без изменений) -->
-        <materialDesign:Card Grid.Row="2" Padding="0">
+        <!-- Таблица: Border вместо Card — без DropShadowEffect/BitmapCache,
+             которые заставляют перерисовывать всю карточку при прокрутке -->
+        <Border Grid.Row="2" Padding="0" CornerRadius="4"
+                Background="{DynamicResource MaterialDesignPaper}"
+                BorderBrush="{DynamicResource MaterialDesignDivider}"
+                BorderThickness="1">
             <DataGrid x:Name="RoomsGrid" ItemsSource="{Binding Rooms}" AutoGenerateColumns="False" IsReadOnly="True"
                       CanUserAddRows="False" HeadersVisibility="Column">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Номер" Binding="{Binding Number}" Width="80"/>
-                    <DataGridTextColumn Header="Тип" Binding="{Binding TypeText}" Width="120"/>
-                    <DataGridTextColumn Header="Цена" Binding="{Binding BasePrice, StringFormat={}{0:N0} ₽}" Width="100"/>
-                    <DataGridTextColumn Header="Гость" Binding="{Binding DisplayGuest}" Width="*"/>
-                    <DataGridTextColumn Header="Даты" Binding="{Binding DateDisplay}" Width="150"/>
-                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingInfo}" Width="150"/>
-                    <DataGridTemplateColumn Header="Статус" Width="120">
+                    <DataGridTextColumn Header="Номер" Binding="{Binding Number}" Width="80" MinWidth="70"/>
+                    <DataGridTextColumn Header="Тип" Binding="{Binding TypeText}" Width="165" MinWidth="150"/>
+                    <DataGridTextColumn Header="Цена" Binding="{Binding BasePrice, StringFormat={}{0:N0} ₽}" Width="100" MinWidth="90"/>
+                    <DataGridTextColumn Header="Гость" Binding="{Binding DisplayGuest}" Width="190" MinWidth="160"/>
+                    <DataGridTextColumn Header="Даты" Binding="{Binding DateDisplay}" Width="180" MinWidth="180"/>
+                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingInfo}" Width="*" MinWidth="220"/>
+                    <DataGridTemplateColumn Header="Статус" Width="120" MinWidth="110">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Border Background="{Binding StatusColor}" CornerRadius="4" Padding="6,2" Margin="4">
@@ -66,6 +70,6 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
-        </materialDesign:Card>
+        </Border>
     </Grid>
 </UserControl>

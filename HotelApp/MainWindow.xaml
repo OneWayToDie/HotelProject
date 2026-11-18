@@ -18,6 +18,7 @@
                 <StackPanel Margin="24">
                     <TextBlock Text="Новый корпус" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
                     <TextBox x:Name="BuildingNameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
+                             MaxLength="50"
                              materialDesign:HintAssist.Hint="Название (например, Корпус В)" Margin="0,0,0,20"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
@@ -34,6 +35,9 @@
                 <StackPanel Margin="24">
                     <TextBlock Text="Изменение цены" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
                     <TextBox x:Name="NewPriceTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
+                             MaxLength="9"
+                             PreviewTextInput="Digits_PreviewTextInput"
+                             DataObject.Pasting="Digits_Pasting"
                              materialDesign:HintAssist.Hint="Новая цена (₽)" Margin="0,0,0,20"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
@@ -67,10 +71,16 @@
                         </ComboBox>
 
                         <TextBox x:Name="RoomNumberTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="Номер (например, 105)" Margin="0,0,0,15"/>
+                                 MaxLength="5"
+                                 PreviewTextInput="Digits_PreviewTextInput"
+                                 DataObject.Pasting="Digits_Pasting"
+                                 materialDesign:HintAssist.Hint="Номер (только цифры, например, 105)" Margin="0,0,0,15"/>
 
                         <TextBox x:Name="RoomPriceTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="Цена за сутки (₽)" Text="2000" Margin="0,0,0,20"/>
+                                 MaxLength="9"
+                                 PreviewTextInput="Digits_PreviewTextInput"
+                                 DataObject.Pasting="Digits_Pasting"
+                                 materialDesign:HintAssist.Hint="Цена за сутки (₽, целое число)" Text="2000" Margin="0,0,0,20"/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
@@ -92,17 +102,30 @@
                         <TextBlock Text="Заселение гостя" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
 
                         <TextBox x:Name="GuestNameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="ФИО Гостя" Margin="0,0,0,15"/>
+                                 MaxLength="100"
+                                 PreviewTextInput="Name_PreviewTextInput"
+                                 DataObject.Pasting="Name_Pasting"
+                                 materialDesign:HintAssist.Hint="ФИО Гостя (только буквы)" Margin="0,0,0,15"/>
 
                         <TextBox x:Name="GuestPassportTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="Паспорт" Margin="0,0,0,15"/>
+                                 MaxLength="11"
+                                 PreviewTextInput="Passport_PreviewTextInput"
+                                 DataObject.Pasting="Passport_Pasting"
+                                 TextChanged="Passport_TextChanged"
+                                 materialDesign:HintAssist.Hint="Паспорт: 1234 567890" Margin="0,0,0,15"/>
 
                         <!-- НОВЫЕ ДАТЫ -->
                         <TextBlock Text="Дата заезда:" Margin="0,0,0,5"/>
-                        <DatePicker x:Name="CheckInDatePicker" Margin="0,0,0,15"/>
+                        <DatePicker x:Name="CheckInDatePicker" Margin="0,0,0,15"
+                                    PreviewTextInput="Date_PreviewTextInput"
+                                    PreviewKeyDown="Date_PreviewKeyDown"
+                                    DataObject.Pasting="Date_Pasting"/>
 
                         <TextBlock Text="Дата выезда:" Margin="0,0,0,5"/>
-                        <DatePicker x:Name="CheckOutDatePicker" Margin="0,0,0,20"/>
+                        <DatePicker x:Name="CheckOutDatePicker" Margin="0,0,0,20"
+                                    PreviewTextInput="Date_PreviewTextInput"
+                                    PreviewKeyDown="Date_PreviewKeyDown"
+                                    DataObject.Pasting="Date_Pasting"/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
@@ -123,16 +146,29 @@
                         <TextBlock Text="Бронирование номера" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
 
                         <TextBox x:Name="BookingGuestNameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="ФИО Гостя" Margin="0,0,0,15"/>
+                                 MaxLength="100"
+                                 PreviewTextInput="Name_PreviewTextInput"
+                                 DataObject.Pasting="Name_Pasting"
+                                 materialDesign:HintAssist.Hint="ФИО Гостя (только буквы)" Margin="0,0,0,15"/>
 
                         <TextBox x:Name="BookingGuestPassportTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" 
-                                 materialDesign:HintAssist.Hint="Паспорт" Margin="0,0,0,15"/>
+                                 MaxLength="11"
+                                 PreviewTextInput="Passport_PreviewTextInput"
+                                 DataObject.Pasting="Passport_Pasting"
+                                 TextChanged="Passport_TextChanged"
+                                 materialDesign:HintAssist.Hint="Паспорт: 1234 567890" Margin="0,0,0,15"/>
 
                         <TextBlock Text="Дата заезда:" Margin="0,0,0,5"/>
-                        <DatePicker x:Name="BookingCheckInDatePicker" Margin="0,0,0,15"/>
+                        <DatePicker x:Name="BookingCheckInDatePicker" Margin="0,0,0,15"
+                                    PreviewTextInput="Date_PreviewTextInput"
+                                    PreviewKeyDown="Date_PreviewKeyDown"
+                                    DataObject.Pasting="Date_Pasting"/>
 
                         <TextBlock Text="Дата выезда:" Margin="0,0,0,5"/>
-                        <DatePicker x:Name="BookingCheckOutDatePicker" Margin="0,0,0,20"/>
+                        <DatePicker x:Name="BookingCheckOutDatePicker" Margin="0,0,0,20"
+                                    PreviewTextInput="Date_PreviewTextInput"
+                                    PreviewKeyDown="Date_PreviewKeyDown"
+                                    DataObject.Pasting="Date_Pasting"/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}" 
@@ -143,6 +179,94 @@
                     </StackPanel>
                 </materialDesign:Card.Content>
             </materialDesign:Card>
+        </DataTemplate>
+
+        <!-- ШАБЛОН: ОКНО ИМПОРТА ИЗ EXCEL -->
+        <!-- Намеренно Border, а не Card: Card навешивает DropShadowEffect + BitmapCache,
+             из-за чего прокрутка таблицы перерисовывает всю карточку каждый кадр. -->
+        <DataTemplate x:Key="ImportDialogTemplate">
+            <Border Width="1000" Height="600" CornerRadius="8"
+                    Background="{DynamicResource MaterialDesignPaper}"
+                    BorderBrush="{DynamicResource MaterialDesignDivider}"
+                    BorderThickness="1">
+                <Grid Margin="24">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Импорт гостей из Excel" FontSize="20" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                    <TextBlock Grid.Row="1" Text="{Binding SummaryText}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,0,6"/>
+
+                    <TextBlock Grid.Row="2" FontSize="11" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,12"
+                               Text="Обязательные колонки: ФИО, Паспорт, Корпус, Тип номера, Номер, Цена за сутки, Дата заезда, Дата выезда. Каждая корректная строка создаёт бронь; отсутствующие корпуса и номера создаются автоматически. Строки с ошибками не импортируются."/>
+
+                    <DataGrid Grid.Row="3" ItemsSource="{Binding Rows}" AutoGenerateColumns="False"
+                              IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              SelectionMode="Single" RowHeight="32">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasError}" Value="True">
+                                        <Setter Property="Background" Value="#FFFCE4E4"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Стр." Binding="{Binding LineNumber}" Width="62" MinWidth="55"/>
+                            <DataGridTextColumn Header="ФИО" Binding="{Binding FullName}" Width="180" MinWidth="150">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="ToolTip" Value="{Binding FullName}"/>
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Корпус" Binding="{Binding Building}" Width="130" MinWidth="110"/>
+                            <DataGridTextColumn Header="Тип" Binding="{Binding RoomType}" Width="135" MinWidth="110"/>
+                            <DataGridTextColumn Header="Номер" Binding="{Binding RoomNumber}" Width="75" MinWidth="65"/>
+                            <DataGridTextColumn Header="Цена" Binding="{Binding PriceText}" Width="85" MinWidth="85"/>
+                            <DataGridTextColumn Header="Даты" Binding="{Binding DatesDisplay}" Width="185" MinWidth="165"/>
+                            <DataGridTemplateColumn Header="Статус" Width="*" MinWidth="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <!-- Без Wrap: фиксированная высота строки + всплывающая подсказка -->
+                                        <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" Margin="4,2"
+                                                   ToolTip="{Binding Status}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasError}" Value="True">
+                                                            <Setter Property="Foreground" Value="#C62828"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding HasError}" Value="False">
+                                                            <Setter Property="Foreground" Value="#2E7D32"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                        <Button Content="Отмена" Style="{StaticResource MaterialDesignFlatButton}"
+                                Click="CancelImport_Click" Margin="0,0,10,0"/>
+                        <Button Content="Импортировать" Style="{StaticResource MaterialDesignRaisedButton}"
+                                Click="ConfirmImport_Click" IsEnabled="{Binding HasValidRows}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </DataTemplate>
 
     </Window.Resources>
@@ -193,8 +317,14 @@
                             </StackPanel>
                         </StackPanel>
                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Шаблон" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0" Click="ExportTemplate_Click"/>
+                            <Button Content="Импорт Excel" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" Click="ImportExcel_Click"/>
                             <Button Content="+ Корпус" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" Click="OpenAddBuilding_Click"/>
                             <Button Content="+ Номер" Style="{StaticResource MaterialDesignRaisedButton}" Margin="0,0,10,0" Click="OpenAddRoom_Click"/>
+                            <Button Content="Очистить БД" Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Foreground="IndianRed" BorderBrush="IndianRed"
+                                    ToolTip="Полностью удалить все данные и начать с чистой базы"
+                                    Click="ClearDatabase_Click"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -217,6 +347,17 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Border>
+            </Grid>
+
+            <!-- ОВЕРЛЕЙ ИМПОРТА EXCEL -->
+            <!-- Специально не DialogHost: его Popup — слоёное окно, и прокрутка
+                 большой таблицы в нём падает до ~6 fps. Обычный слой в окне — быстрый. -->
+            <Grid x:Name="ImportOverlay" Grid.ColumnSpan="2" Panel.ZIndex="100" Visibility="Collapsed"
+                  KeyDown="ImportOverlay_KeyDown">
+                <Border Background="#8C000000" MouseLeftButtonDown="ImportOverlay_Click"/>
+                <ContentControl x:Name="ImportDialogHost"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Focusable="False"/>
             </Grid>
         </Grid>
     </materialDesign:DialogHost>

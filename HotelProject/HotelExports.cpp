@@ -84,30 +84,35 @@ extern "C" {
     __declspec(dllexport) int Hotel_GetAllRooms(void* ptr, CRoom* buffer, int maxSize) {
         if (!ptr) return 0;
         Hotel* hotel = static_cast<Hotel*>(ptr);
-        auto rooms = hotel->GetAllRooms();
-        int count = (int)rooms.size();
-        if (count > maxSize) count = maxSize;
 
-        for (int i = 0; i < count; i++) {
-            auto r = rooms[i];
-            buffer[i].id = r->GetId();
-            CopyStr(buffer[i].number, sizeof(buffer[i].number), r->GetNumber());
-            buffer[i].capacity = r->GetCapacity();
-            buffer[i].basePrice = r->GetBasePrice();
-            buffer[i].status = (int)r->GetStatus();
+        // Обходим корпуса и их номера, чтобы заполнить buildingId
+        int index = 0;
+        for (auto& b : hotel->GetBuildings()) {
+            for (auto& r : b->GetRooms()) {
+                if (index >= maxSize) break;
 
-            std::string typeName = r->GetTypeName();
-            if (typeName == "Люкс") buffer[i].type = 1;
-            else if (typeName == "Конференц-зал") buffer[i].type = 2;
-            else buffer[i].type = 0;
+                buffer[index].id = r->GetId();
+                buffer[index].buildingId = b->GetId();
+                CopyStr(buffer[index].number, sizeof(buffer[index].number), r->GetNumber());
+                buffer[index].capacity = r->GetCapacity();
+                buffer[index].basePrice = r->GetBasePrice();
+                buffer[index].status = (int)r->GetStatus();
 
-            CopyStr(buffer[i].guestName, sizeof(buffer[i].guestName), r->GetGuestName());
-            CopyStr(buffer[i].guestPassport, sizeof(buffer[i].guestPassport), r->GetGuestPassport());
+                std::string typeName = r->GetTypeName();
+                if (typeName == "Люкс") buffer[index].type = 1;
+                else if (typeName == "Конференц-зал") buffer[index].type = 2;
+                else buffer[index].type = 0;
 
-            CopyStr(buffer[i].checkInDate, sizeof(buffer[i].checkInDate), r->GetCheckInDate());
-            CopyStr(buffer[i].checkOutDate, sizeof(buffer[i].checkOutDate), r->GetCheckOutDate());
+                CopyStr(buffer[index].guestName, sizeof(buffer[index].guestName), r->GetGuestName());
+                CopyStr(buffer[index].guestPassport, sizeof(buffer[index].guestPassport), r->GetGuestPassport());
+
+                CopyStr(buffer[index].checkInDate, sizeof(buffer[index].checkInDate), r->GetCheckInDate());
+                CopyStr(buffer[index].checkOutDate, sizeof(buffer[index].checkOutDate), r->GetCheckOutDate());
+
+                index++;
+            }
         }
-        return count;
+        return index;
     }
 
     __declspec(dllexport) int Hotel_GetAllBuildings(void* ptr, CBuilding* buffer, int maxSize) {
@@ -149,6 +154,18 @@ extern "C" {
             CopyStr(buffer[i].passport, sizeof(buffer[i].passport), guests[i]->passport);
         }
         return count;
+    }
+
+    // Удалить гостя из базы (Id остальных гостей не меняются)
+    // Полная очистка базы (Id начинаются с 1, создаются два корпуса по умолчанию)
+    __declspec(dllexport) void Hotel_ClearAll(void* ptr) {
+        if (!ptr) return;
+        static_cast<Hotel*>(ptr)->ClearAll();
+    }
+
+    __declspec(dllexport) bool Hotel_DeleteGuest(void* ptr, int guestId) {
+        if (!ptr) return false;
+        return static_cast<Hotel*>(ptr)->DeleteGuest(guestId);
     }
 
     __declspec(dllexport) double Hotel_GetTotalRevenue(void* ptr) {

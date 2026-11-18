@@ -11,24 +11,58 @@
 
         <TextBlock Text="База гостей отеля" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
 
-        <!-- Живой поиск по ФИО и паспорту -->
-        <DockPanel Grid.Row="1" Width="340" HorizontalAlignment="Left" Margin="0,0,0,15">
-            <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" VerticalAlignment="Bottom"
-                                     Margin="0,0,8,8" Foreground="Gray"/>
-            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                     materialDesign:HintAssist.Hint="Поиск по ФИО или паспорту"
-                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
-        </DockPanel>
+        <!-- Живой поиск по ФИО и паспорту + удаление гостя -->
+        <Grid Grid.Row="1" Margin="0,0,0,15">
+            <DockPanel Width="340" HorizontalAlignment="Left">
+                <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" VerticalAlignment="Bottom"
+                                         Margin="0,0,8,8" Foreground="Gray"/>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         materialDesign:HintAssist.Hint="Поиск по ФИО или паспорту"
+                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
+            </DockPanel>
 
-        <materialDesign:Card Grid.Row="2" Padding="0">
-            <DataGrid ItemsSource="{Binding Guests}" AutoGenerateColumns="False" IsReadOnly="True"
-                      CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+            <Button x:Name="DeleteGuestButton" Content="Удалить гостя"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    HorizontalAlignment="Right" Width="170"
+                    Click="DeleteGuest_Click"/>
+        </Grid>
+
+        <!-- Border вместо Card: убираем DropShadowEffect + BitmapCache вокруг DataGrid -->
+        <Border Grid.Row="2" Padding="0" CornerRadius="4"
+                Background="{DynamicResource MaterialDesignPaper}"
+                BorderBrush="{DynamicResource MaterialDesignDivider}"
+                BorderThickness="1">
+            <DataGrid x:Name="GuestsGrid" ItemsSource="{Binding Guests}" AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" HeadersVisibility="Column">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="80"/>
-                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="*"/>
-                    <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="200"/>
+                    <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="60" MinWidth="50"/>
+                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="*" MinWidth="220" MaxWidth="430">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="ToolTip" Value="{Binding FullName}"/>
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="200" MinWidth="160"/>
+                    <DataGridTextColumn Header="Даты проживания" Binding="{Binding StayDisplay}" Width="*" MinWidth="190">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="ToolTip" Value="{Binding StayToolTip}"/>
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Бронь" Binding="{Binding BookingDisplay}" Width="*" MinWidth="190">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="ToolTip" Value="{Binding BookingToolTip}"/>
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
-        </materialDesign:Card>
+        </Border>
     </Grid>
 </UserControl>

@@ -45,6 +45,19 @@ namespace HotelApp.ViewModels
 
 		public void RefreshData()
 		{
+			try
+			{
+				LoadRooms();
+			}
+			catch (Exception ex)
+			{
+				_mainVm.AddLog($"Номера и Фонд: не удалось загрузить данные. {ex.Message}", LogType.Error);
+				AppDialog.Error($"Не удалось загрузить список номеров.\n{ex.Message}", "Номера и Фонд");
+			}
+		}
+
+		private void LoadRooms()
+		{
 			// Загружаем корпуса
 			var bBuffer = new CBuilding[100];
 			int bCount = NativeMethods.Hotel_GetAllBuildings(_hotelPtr, bBuffer, 100);
@@ -123,18 +136,25 @@ namespace HotelApp.ViewModels
 			string guestName = room?.GuestName;
 			string roomNumber = room?.Number ?? roomId.ToString();
 
-			double price = NativeMethods.Hotel_CheckOut(_hotelPtr, roomId);
-			if (price > 0)
+			try
 			{
-				RefreshData();
-				_mainVm.SaveData();
-				_mainVm.AddLog($"Выселение: {guestName} из номера {roomNumber}. Оплата: {price:C}", LogType.Success);
-				MessageBox.Show($"Гость выселен.\nК оплате: {price:C}", "Выселение", MessageBoxButton.OK, MessageBoxImage.Information);
+				double price = NativeMethods.Hotel_CheckOut(_hotelPtr, roomId);
+				if (price > 0)
+				{
+					RefreshData();
+					_mainVm.SaveData();
+					_mainVm.AddLog($"Выселение: {guestName} из номера {roomNumber}. Оплата: {price:C}", LogType.Success);
+					AppDialog.Success($"Гость выселен.\nК оплате: {price:C}", "Выселение");
+				}
+				else
+				{
+					_mainVm.AddLog($"Выселение из номера {roomNumber} не выполнено: в номере нет гостя.", LogType.Error);
+					AppDialog.Warning("Не удалось выселить. В номере нет гостя.", "Ошибка");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				_mainVm.AddLog($"Выселение из номера {roomNumber} не выполнено: в номере нет гостя.", LogType.Error);
-				MessageBox.Show("Не удалось выселить. В номере нет гостя.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+				HandleError("выселение гостя", ex);
 			}
 		}
 
@@ -144,11 +164,18 @@ namespace HotelApp.ViewModels
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
 			string roomNumber = room?.Number ?? roomId.ToString();
 
-			NativeMethods.Hotel_FinishCleaning(_hotelPtr, roomId);
-			RefreshData();
-			_mainVm.SaveData();
-			_mainVm.AddLog($"Уборка: номер {roomNumber} снова свободен.", LogType.Success);
-			MessageBox.Show("Уборка завершена! Номер снова свободен.", "Успех");
+			try
+			{
+				NativeMethods.Hotel_FinishCleaning(_hotelPtr, roomId);
+				RefreshData();
+				_mainVm.SaveData();
+				_mainVm.AddLog($"Уборка: номер {roomNumber} снова свободен.", LogType.Success);
+				AppDialog.Success("Уборка завершена! Номер снова свободен.", "Успех");
+			}
+			catch (Exception ex)
+			{
+				HandleError("завершение уборки", ex);
+			}
 		}
 
 		public void UpdatePrice(int roomId, double newPrice)
@@ -159,14 +186,21 @@ namespace HotelApp.ViewModels
 			if (newPrice <= 0)
 			{
 				_mainVm.AddLog($"Номер {roomNumber}: цена не изменена (некорректное значение {newPrice}).", LogType.Error);
-				MessageBox.Show("Цена должна быть больше нуля!", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+				AppDialog.Warning("Цена должна быть целым числом больше нуля!", "Ошибка");
 				return;
 			}
 
-			NativeMethods.Hotel_UpdatePrice(_hotelPtr, roomId, newPrice);
-			RefreshData();
-			_mainVm.SaveData();
-			_mainVm.AddLog($"Номер {roomNumber}: новая цена {newPrice:N0} ₽.", LogType.Success);
+			try
+			{
+				NativeMethods.Hotel_UpdatePrice(_hotelPtr, roomId, newPrice);
+				RefreshData();
+				_mainVm.SaveData();
+				_mainVm.AddLog($"Номер {roomNumber}: новая цена {newPrice:N0} ₽.", LogType.Success);
+			}
+			catch (Exception ex)
+			{
+				HandleError("изменение цены", ex);
+			}
 		}
 
 		public void CheckIn(int roomId, string guestName, string passport, string inDate, string outDate, int days)
@@ -174,29 +208,36 @@ namespace HotelApp.ViewModels
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
 			string roomNumber = room?.Number ?? roomId.ToString();
 
-			// Нельзя заселить на даты, которые уже забронированы другим гостем
-			if (_mainVm.HasBookingConflict(roomId, inDate, outDate, guestName, passport))
+			try
 			{
-				_mainVm.AddLog($"Заселение {guestName} в номер {roomNumber} не выполнено: даты заняты бронью.", LogType.Error);
-				MessageBox.Show($"Номер {roomNumber} забронирован на выбранные даты!\nВыберите другие даты или снимите бронь.",
-					"Бронирование", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
+				// Нельзя заселить на даты, которые уже забронированы другим гостем
+				if (_mainVm.HasBookingConflict(roomId, inDate, outDate, guestName, passport))
+				{
+					_mainVm.AddLog($"Заселение {guestName} в номер {roomNumber} не выполнено: даты заняты бронью.", LogType.Error);
+					AppDialog.Warning($"Номер {roomNumber} забронирован на выбранные даты!\nВыберите другие даты или снимите бронь.",
+						"Бронирование");
+					return;
+				}
 
-			// Вызываем C++ с 6 аргументами
-			bool success = NativeMethods.Hotel_CheckIn(_hotelPtr, roomId, guestName, passport, inDate, outDate, days);
+				// Вызываем C++ с 6 аргументами
+				bool success = NativeMethods.Hotel_CheckIn(_hotelPtr, roomId, guestName, passport, inDate, outDate, days);
 
-			if (success)
-			{
-				RefreshData();
-				_mainVm.SaveData(); // Сохраняем в файл
-				_mainVm.AddLog($"Заселение: {guestName} -> номер {roomNumber}, {inDate} - {outDate} ({days} дн.).", LogType.Success);
-				MessageBox.Show($"Гость {guestName} успешно заселен!", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+				if (success)
+				{
+					RefreshData();
+					_mainVm.SaveData(); // Сохраняем в файл
+					_mainVm.AddLog($"Заселение: {guestName} -> номер {roomNumber}, {inDate} - {outDate} ({days} дн.).", LogType.Success);
+					AppDialog.Success($"Гость {guestName} успешно заселен!", "Успех");
+				}
+				else
+				{
+					_mainVm.AddLog($"Заселение {guestName} в номер {roomNumber} не выполнено: номер занят или на уборке.", LogType.Error);
+					AppDialog.Warning("Не удалось заселить. Возможно, номер занят или на уборке.", "Ошибка");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				_mainVm.AddLog($"Заселение {guestName} в номер {roomNumber} не выполнено: номер занят или на уборке.", LogType.Error);
-				MessageBox.Show("Не удалось заселить. Возможно, номер занят или на уборке.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+				HandleError("заселение гостя", ex);
 			}
 		}
 
@@ -206,22 +247,36 @@ namespace HotelApp.ViewModels
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
 			string roomNumber = room?.Number ?? roomId.ToString();
 
-			bool success = NativeMethods.Hotel_BookRoom(_hotelPtr, roomId, guestName, passport, inDate, outDate);
+			try
+			{
+				bool success = NativeMethods.Hotel_BookRoom(_hotelPtr, roomId, guestName, passport, inDate, outDate);
 
-			if (success)
-			{
-				RefreshData();
-				_mainVm.SaveData();
-				_mainVm.AddLog($"Бронирование: {guestName} -> номер {roomNumber}, {inDate} - {outDate}.", LogType.Success);
-				MessageBox.Show($"Номер {roomNumber} забронирован на {guestName}\n{inDate} - {outDate}",
-					"Бронирование", MessageBoxButton.OK, MessageBoxImage.Information);
+				if (success)
+				{
+					RefreshData();
+					_mainVm.SaveData();
+					_mainVm.AddLog($"Бронирование: {guestName} -> номер {roomNumber}, {inDate} - {outDate}.", LogType.Success);
+					AppDialog.Success($"Номер {roomNumber} забронирован на {guestName}\n{inDate} - {outDate}",
+						"Бронирование");
+				}
+				else
+				{
+					_mainVm.AddLog($"Бронирование {guestName} в номер {roomNumber} не выполнено: даты пересекаются с другой бронью.", LogType.Error);
+					AppDialog.Warning("Не удалось забронировать: на выбранные даты номер уже забронирован или даты некорректны.",
+						"Ошибка");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				_mainVm.AddLog($"Бронирование {guestName} в номер {roomNumber} не выполнено: даты пересекаются с другой бронью.", LogType.Error);
-				MessageBox.Show("Не удалось забронировать: на выбранные даты номер уже забронирован или даты некорректны.",
-					"Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+				HandleError("бронирование номера", ex);
 			}
+		}
+
+		// Единая обработка ошибок нативного слоя: журнал + сообщение пользователю
+		private void HandleError(string action, Exception ex)
+		{
+			_mainVm.AddLog($"{action}: {ex.Message}", LogType.Error);
+			AppDialog.Error($"Не удалось выполнить действие «{action}».\n{ex.Message}", "Ошибка");
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;

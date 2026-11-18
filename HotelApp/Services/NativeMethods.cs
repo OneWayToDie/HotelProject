@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Runtime.InteropServices;
 
 namespace HotelApp.Services
@@ -96,5 +96,11 @@ namespace HotelApp.Services
 
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllBookings(IntPtr ptr, [Out] CBooking[] buffer, int maxSize);
+
+		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+		public static extern bool Hotel_DeleteGuest(IntPtr ptr, int guestId);
+
+		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+		public static extern void Hotel_ClearAll(IntPtr ptr);
 	}
 }
