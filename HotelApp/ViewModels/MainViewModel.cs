@@ -28,6 +28,7 @@ namespace HotelApp.ViewModels
 		public int FreeRooms { get => _freeRooms; set { _freeRooms = value; OnPropertyChanged(); } }
 
 		private int _occupiedRooms;
+		public double OccupancyPercent => TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
 		public int OccupiedRooms { get => _occupiedRooms; set { _occupiedRooms = value; OnPropertyChanged(); } }
 
 		private double _revenueToday;
@@ -113,6 +114,8 @@ namespace HotelApp.ViewModels
 			{
 				AddLog("Не удалось пересчитать статистику: " + ex.Message, LogType.Error);
 			}
+
+			OnPropertyChanged(nameof(OccupancyPercent));
 		}
 
 		// Проверка: не заняты ли выбранные даты чужой бронью

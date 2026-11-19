@@ -17,6 +17,25 @@ namespace HotelApp
 		public MainWindow()
 		{
 			InitializeComponent();
+			this.Loaded += MainWindow_Loaded;
+		}
+
+		private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+		{
+			if (DataContext is MainViewModel vm)
+			{
+				// Регистрируем горячие клавиши
+				HotkeyService.Register(this, vm);
+			}
+		}
+
+		public void RefreshView()
+		{
+			if (DataContext is MainViewModel vm)
+			{
+				RefreshCurrentView(vm);
+				vm.AddLog("Экран обновлен вручную.", LogType.Info);
+			}
 		}
 
 		private void MenuList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -34,7 +53,33 @@ namespace HotelApp
 
 				else if (MenuList.SelectedIndex == 3) // Карта отеля
 					vm.CurrentView = new MapView { DataContext = new MapViewModel(vm.HotelPtr) };
+
+				else if (MenuList.SelectedIndex == 4) // НАСТРОЙКИ
+					OpenSettingsDialog();
 			}
+		}
+
+		// --- НАСТРОЙКИ ---
+		private async void OpenSettingsDialog()
+		{
+			if (!(DataContext is MainViewModel vm)) return;
+			if (DialogHost.IsDialogOpen("RootDialog")) return;
+
+			var settingsView = new SettingsView
+			{
+				DataContext = new SettingsViewModel(this, vm)
+			};
+
+			// Ждем закрытия диалога
+			await DialogHost.Show(settingsView, "RootDialog");
+
+			// === ЖЁСТКИЙ ВОССТАНОВЛЕНИЕ ФОКУСА ===
+			// 1. Сбрасываем любой "залипший" фокус от DialogHost
+			Keyboard.ClearFocus();
+
+			// 2. Возвращаем фокус главному окну
+			this.Focus();
+			Keyboard.Focus(this);
 		}
 
 		// --- ДОБАВЛЕНИЕ КОРПУСА ---
@@ -288,6 +333,28 @@ namespace HotelApp
 		{
 			ImportOverlay.Visibility = Visibility.Collapsed;
 			ImportDialogHost.Content = null;
+		}
+
+		// --- О ПРОГРАММЕ ---
+		private async void OpenAbout_Click(object sender, RoutedEventArgs e)
+		{
+			// Убедимся, что DialogHost не открыт
+			if (DialogHost.IsDialogOpen("RootDialog")) return;
+
+			var template = (DataTemplate)FindResource("AboutDialogTemplate");
+			var dialogContent = template.LoadContent() as FrameworkElement;
+			await DialogHost.Show(dialogContent, "RootDialog");
+		}
+
+		// --- ССЫЛКА НА GITHUB ---
+		private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+		{
+			try
+			{
+				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+				e.Handled = true;
+			}
+			catch { }
 		}
 
 		// --- ПОДТВЕРЖДЕНИЕ ИМПОРТА ---
@@ -557,5 +624,13 @@ namespace HotelApp
 			if (!e.DataObject.GetDataPresent(typeof(string))) return null;
 			return e.DataObject.GetData(typeof(string)) as string;
 		}
+
+		// --- ПУБЛИЧНЫЕ ОБЁРТКИ ДЛЯ ГОРЯЧИХ КЛАВИШ ---
+		// Вызывают существующие private-обработчики, не ломая инкапсуляцию.
+		public void TriggerRefresh() => RefreshCurrentView(DataContext as MainViewModel);
+		public void TriggerImportExcel() => ImportExcel_Click(null, null);
+		public void TriggerAddBuilding() => OpenAddBuilding_Click(null, null);
+		public void TriggerAddRoom() => OpenAddRoom_Click(null, null);
+		public void TriggerAbout() => OpenAbout_Click(null, null);
 	}
 }

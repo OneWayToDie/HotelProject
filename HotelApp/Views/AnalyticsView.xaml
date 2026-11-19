@@ -157,7 +157,7 @@
                     </materialDesign:Card>
 
                     <!-- График 3: Распределение по типам номеров -->
-                    <materialDesign:Card Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
+                    <materialDesign:Card Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2"
                      Margin="0,0,0,16" Padding="16" UniformCornerRadius="12">
                         <StackPanel>
                             <TextBlock Text="Популярность типов номеров (по кол-ву броней)"
@@ -167,7 +167,8 @@
                       LegendLocation="Right"
                       InnerRadius="60"
                       Hoverable="True"
-                      DataTooltip="{x:Null}">
+                      DataTooltip="{x:Null}"
+                      DataClick="PieChart_DataClick">
                                 <lvc:PieChart.ChartLegend>
                                     <lvc:DefaultLegend BulletSize="12"/>
                                 </lvc:PieChart.ChartLegend>

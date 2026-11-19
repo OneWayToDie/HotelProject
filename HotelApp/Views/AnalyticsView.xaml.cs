@@ -1,28 +1,38 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using HotelApp.ViewModels;
+using LiveCharts;
+using LiveCharts.Wpf;
+using MaterialDesignThemes.Wpf;
 
 namespace HotelApp.Views
 {
-	/// <summary>
-	/// Interaction logic for AnalyticsView.xaml
-	/// </summary>
 	public partial class AnalyticsView : UserControl
 	{
 		public AnalyticsView()
 		{
 			InitializeComponent();
+		}
+
+		private async void PieChart_DataClick(object sender, ChartPoint point)
+		{
+			// Проверяем, что клик был по сектору (PieSeries), а не по легенде
+			if (point.SeriesView is PieSeries pieSeries && DataContext is AnalyticsViewModel vm)
+			{
+				string typeName = pieSeries.Title; // "Стандарт", "Люкс" или "Конференц-зал"
+
+				// Вызываем команду ViewModel — она заполнит SelectedTypeGuests
+				vm.ShowRoomTypeDetailsCommand.Execute(typeName);
+
+				// Открываем модальное окно с результатами
+				var template = (DataTemplate)Application.Current.MainWindow.FindResource("RoomTypeDetailsDialogTemplate");
+				if (template == null) return;
+
+				var dialogContent = template.LoadContent() as FrameworkElement;
+				dialogContent.DataContext = vm; // Привязываем к тому же ViewModel, где уже есть данные
+
+				await DialogHost.Show(dialogContent, "RootDialog");
+			}
 		}
 	}
 }

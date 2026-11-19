@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using System.Windows.Media;
+using HotelApp.Models;
 using HotelApp.Services;
 using LiveCharts;
 using LiveCharts.Wpf;
@@ -42,9 +45,13 @@ namespace HotelApp.ViewModels
 		public SeriesCollection RevenueSeries { get; set; }
 		public SeriesCollection OccupancySeries { get; set; }
 		public SeriesCollection RoomTypeSeries { get; set; }
+
 		public string[] MonthLabels { get; set; }
 		public Func<double, string> YFormatterRevenue { get; set; }
 		public Func<double, string> YFormatterCount { get; set; }
+		public ObservableCollection<RoomTypeDetailsModel> SelectedTypeGuests { get; } = new ObservableCollection<RoomTypeDetailsModel>();
+		public ICommand ShowRoomTypeDetailsCommand { get; }
+		
 
 		public AnalyticsViewModel(IntPtr hotelPtr)
 		{
@@ -54,6 +61,8 @@ namespace HotelApp.ViewModels
 			RevenueSeries = new SeriesCollection();
 			OccupancySeries = new SeriesCollection();
 			RoomTypeSeries = new SeriesCollection();
+			ShowRoomTypeDetailsCommand = new RelayCommand(param => ShowRoomTypeDetails(param as string));
+
 			MonthLabels = new string[0];
 
 			YFormatterRevenue = value => value.ToString("N0") + " ₽";
@@ -207,6 +216,61 @@ namespace HotelApp.ViewModels
 			if (days <= 0) return false;
 			revenue = room.BasePrice * days;
 			return true;
+		}
+
+		private void ShowRoomTypeDetails(string typeName)
+		{
+			SelectedTypeGuests.Clear();
+
+			// Определяем числовой тип: 0 - Стандарт, 1 - Люкс, 2 - Конференц-зал
+			int targetType = 0;
+			if (typeName == "Люкс") targetType = 1;
+			else if (typeName == "Конференц-зал") targetType = 2;
+
+			// 1. Получаем номера
+			var rooms = new CRoom[1000];
+			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
+
+			var roomTypeDict = new Dictionary<int, int>();
+			var roomNumberDict = new Dictionary<int, string>();
+
+			for (int i = 0; i < roomCount; i++)
+			{
+				roomTypeDict[rooms[i].Id] = rooms[i].Type;
+				roomNumberDict[rooms[i].Id] = rooms[i].Number;
+
+				// Текущие проживания
+				if (rooms[i].Type == targetType && rooms[i].Status == 1)
+				{
+					SelectedTypeGuests.Add(new RoomTypeDetailsModel
+					{
+						GuestName = rooms[i].GuestName,
+						Passport = rooms[i].GuestPassport,
+						RoomNumber = rooms[i].Number,
+						DatesDisplay = $"{rooms[i].CheckInDate} - {rooms[i].CheckOutDate}"
+					});
+				}
+			}
+
+			// 2. Получаем бронирования
+			var bookings = new CBooking[1000];
+			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
+
+			for (int i = 0; i < bookingCount; i++)
+			{
+				if (roomTypeDict.TryGetValue(bookings[i].RoomId, out int rType) && rType == targetType)
+				{
+					string roomNum = roomNumberDict.TryGetValue(bookings[i].RoomId, out string num) ? num : "?";
+
+					SelectedTypeGuests.Add(new RoomTypeDetailsModel
+					{
+						GuestName = bookings[i].GuestName,
+						Passport = bookings[i].Passport,
+						RoomNumber = roomNum,
+						DatesDisplay = $"{bookings[i].CheckInDate} - {bookings[i].CheckOutDate}"
+					});
+				}
+			}
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
