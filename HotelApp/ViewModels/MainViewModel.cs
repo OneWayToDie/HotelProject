@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 using HotelApp.Models;
 using HotelApp.Services;
 
@@ -37,6 +38,48 @@ namespace HotelApp.ViewModels
 		// Путь к файлу сохранения (в папке с программой .exe)
 		private readonly string _dataFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotel_data.txt");
 
+		// --- ИНДИКАТОР СОСТОЯНИЯ БАЗЫ ДАННЫХ ---
+		// true — загрузка/сохранение прошли успешно, false — ошибка, null — база ещё не сохранялась.
+		private bool? _isDatabaseOk;
+
+		private static readonly Brush DatabaseOkBrush = CreateFrozenBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+		private static readonly Brush DatabaseErrorBrush = CreateFrozenBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+		private static readonly Brush DatabaseNewBrush = CreateFrozenBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
+
+		public bool? IsDatabaseOk
+		{
+			get => _isDatabaseOk;
+			private set
+			{
+				if (_isDatabaseOk == value) return;
+				_isDatabaseOk = value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(DatabaseStatusBrush));
+				OnPropertyChanged(nameof(DatabaseStatusText));
+				OnPropertyChanged(nameof(DatabaseStatusToolTip));
+			}
+		}
+
+		public Brush DatabaseStatusBrush =>
+			_isDatabaseOk == true ? DatabaseOkBrush :
+			_isDatabaseOk == false ? DatabaseErrorBrush : DatabaseNewBrush;
+
+		public string DatabaseStatusText =>
+			_isDatabaseOk == true ? "БД: подключена" :
+			_isDatabaseOk == false ? "БД: ошибка" : "БД: новая";
+
+		public string DatabaseStatusToolTip =>
+			_isDatabaseOk == true ? "База данных загружена, сохранение работает.\n" + _dataFile :
+			_isDatabaseOk == false ? "Ошибка доступа к базе данных. Подробности — в журнале.\n" + _dataFile :
+			"Файл сохранения ещё не создан — данные сохранятся при первом изменении.\n" + _dataFile;
+
+		private static Brush CreateFrozenBrush(Color color)
+		{
+			var brush = new SolidColorBrush(color);
+			brush.Freeze();
+			return brush;
+		}
+
 		public MainViewModel()
 		{
 			try
@@ -47,14 +90,17 @@ namespace HotelApp.ViewModels
 				if (NativeMethods.Hotel_Load(HotelPtr, _dataFile))
 				{
 					AddLog("Данные успешно загружены из файла.");
+					IsDatabaseOk = true;
 				}
 				else
 				{
 					AddLog("Файл сохранения не найден. Создана новая база.");
+					IsDatabaseOk = null;
 				}
 			}
 			catch (Exception ex)
 			{
+				IsDatabaseOk = false;
 				AddLog("Не удалось открыть базу данных: " + ex.Message, LogType.Error);
 				AppDialog.Error("Не удалось открыть базу данных.\n" + ex.Message, "Запуск");
 			}
@@ -183,12 +229,19 @@ namespace HotelApp.ViewModels
 			try
 			{
 				if (NativeMethods.Hotel_Save(HotelPtr, _dataFile))
+				{
 					AddLog("Данные сохранены в файл.");
+					IsDatabaseOk = true;
+				}
 				else
+				{
 					AddLog("Не удалось сохранить данные в файл.", LogType.Error);
+					IsDatabaseOk = false;
+				}
 			}
 			catch (Exception ex)
 			{
+				IsDatabaseOk = false;
 				AddLog("Ошибка сохранения данных: " + ex.Message, LogType.Error);
 			}
 		}

@@ -241,7 +241,9 @@ namespace HotelApp.Services
 		#region Запись
 
 		// Пишет один лист с шапкой. Поддерживаются string, int, double, DateTime.
-		public static void Write(string path, string sheetName, string[] headers, IList<object[]> rows)
+		// columnWidths — ширины колонок (null — стандартные для шаблона гостей).
+		public static void Write(string path, string sheetName, string[] headers, IList<object[]> rows,
+			int[] columnWidths = null, bool includeRoomTypeValidation = true, bool includeAutoFilter = true)
 		{
 			if (File.Exists(path)) File.Delete(path);
 
@@ -252,7 +254,8 @@ namespace HotelApp.Services
 				WriteEntry(zip, "xl/workbook.xml", w => WriteWorkbook(w, sheetName));
 				WriteEntry(zip, "xl/_rels/workbook.xml.rels", w => WriteWorkbookRels(w));
 				WriteEntry(zip, "xl/styles.xml", w => WriteStyles(w));
-				WriteEntry(zip, "xl/worksheets/sheet1.xml", w => WriteSheet(w, headers, rows));
+				WriteEntry(zip, "xl/worksheets/sheet1.xml",
+					w => WriteSheet(w, headers, rows, columnWidths, includeRoomTypeValidation, includeAutoFilter));
 			}
 		}
 
@@ -511,7 +514,8 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
-		private static void WriteSheet(XmlWriter w, string[] headers, IList<object[]> rows)
+		private static void WriteSheet(XmlWriter w, string[] headers, IList<object[]> rows,
+			int[] columnWidths, bool includeRoomTypeValidation, bool includeAutoFilter)
 		{
 			int lastRow = rows.Count + 1;
 			string lastColumn = ColumnName(headers.Length);
@@ -540,15 +544,23 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 
 			w.WriteStartElement("cols");
-			WriteColumn(w, 1, 5);
-			WriteColumn(w, 2, 32);
-			WriteColumn(w, 3, 18);
-			WriteColumn(w, 4, 20);
-			WriteColumn(w, 5, 20);
-			WriteColumn(w, 6, 8);
-			WriteColumn(w, 7, 15);
-			WriteColumn(w, 8, 15);
-			WriteColumn(w, 9, 15);
+			if (columnWidths != null && columnWidths.Length > 0)
+			{
+				for (int i = 0; i < columnWidths.Length; i++)
+					WriteColumn(w, i + 1, columnWidths[i]);
+			}
+			else
+			{
+				WriteColumn(w, 1, 5);
+				WriteColumn(w, 2, 32);
+				WriteColumn(w, 3, 18);
+				WriteColumn(w, 4, 20);
+				WriteColumn(w, 5, 20);
+				WriteColumn(w, 6, 8);
+				WriteColumn(w, 7, 15);
+				WriteColumn(w, 8, 15);
+				WriteColumn(w, 9, 15);
+			}
 			w.WriteEndElement();
 
 			w.WriteStartElement("sheetData");
@@ -578,12 +590,15 @@ namespace HotelApp.Services
 
 			w.WriteEndElement(); // sheetData
 
-			w.WriteStartElement("autoFilter");
-			w.WriteAttributeString("ref", $"A1:{lastColumn}{lastRow}");
-			w.WriteEndElement();
+			if (includeAutoFilter && lastRow >= 1)
+			{
+				w.WriteStartElement("autoFilter");
+				w.WriteAttributeString("ref", $"A1:{lastColumn}{lastRow}");
+				w.WriteEndElement();
+			}
 
-			// Выпадающий список для типа номера (колонка E)
-			if (lastRow >= 2)
+			// Выпадающий список для типа номера (колонка E) — только для шаблона гостей
+			if (includeRoomTypeValidation && lastRow >= 2)
 			{
 				w.WriteStartElement("dataValidations");
 				w.WriteAttributeString("count", "1");

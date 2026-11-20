@@ -46,10 +46,51 @@ namespace HotelApp.ViewModels
 		public SeriesCollection OccupancySeries { get; set; }
 		public SeriesCollection RoomTypeSeries { get; set; }
 
+		private bool _isLineChart;
+
+		// Тип графиков: столбцы (по умолчанию) или линии.
+		public bool IsLineChart
+		{
+			get => _isLineChart;
+			set
+			{
+				if (_isLineChart == value) return;
+				_isLineChart = value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(ChartTypeLabel));
+				Refresh();
+			}
+		}
+
+		public string ChartTypeLabel => _isLineChart ? "Линии" : "Столбцы";
+
 		public string[] MonthLabels { get; set; }
+
+		// Числовая ось X: месяц с индексом i стоит на значении i. Полтора шага
+		// запаса слева и справа: LiveCharts не подписывает значение вплотную
+		// к правой границе, поэтому без запаса последний месяц (апрель) пропадал.
+		public double AxisMinValue => -1.5;
+		public double AxisMaxValue { get; private set; } = double.NaN;
+		public Func<double, string> MonthLabelFormatter { get; private set; }
+
 		public Func<double, string> YFormatterRevenue { get; set; }
 		public Func<double, string> YFormatterCount { get; set; }
-		public ObservableCollection<RoomTypeDetailsModel> SelectedTypeGuests { get; } = new ObservableCollection<RoomTypeDetailsModel>();
+
+		// Коллекция заменяется целиком: DataGrid получает одно уведомление
+		// вместо Clear + Add на каждый элемент (это и вызывало подвисания).
+		private ObservableCollection<RoomTypeDetailsModel> _selectedTypeGuests =
+			new ObservableCollection<RoomTypeDetailsModel>();
+
+		public ObservableCollection<RoomTypeDetailsModel> SelectedTypeGuests
+		{
+			get => _selectedTypeGuests;
+			private set
+			{
+				_selectedTypeGuests = value;
+				OnPropertyChanged();
+			}
+		}
+
 		public ICommand ShowRoomTypeDetailsCommand { get; }
 		
 
@@ -64,6 +105,16 @@ namespace HotelApp.ViewModels
 			ShowRoomTypeDetailsCommand = new RelayCommand(param => ShowRoomTypeDetails(param as string));
 
 			MonthLabels = new string[0];
+
+			// Подпись числовой оси: целое значение -> месяц, дробные засечки не подписываем.
+			MonthLabelFormatter = value =>
+			{
+				double rounded = Math.Round(value);
+				if (Math.Abs(value - rounded) > 0.25) return string.Empty;
+				int index = (int)rounded;
+				if (index < 0 || index >= MonthLabels.Length) return string.Empty;
+				return MonthLabels[index];
+			};
 
 			YFormatterRevenue = value => value.ToString("N0") + " ₽";
 			YFormatterCount = value => value.ToString("N0");
@@ -83,7 +134,16 @@ namespace HotelApp.ViewModels
 			FreeRooms = 0;
 			OccupiedRooms = 0;
 			CleaningRooms = 0;
-			ExpectedRevenue = 0;
+
+			// Полная ожидаемая выручка (текущие заселения + активные/будущие брони)
+			// используется для расчёта общей выручки за всё время.
+			double allExpectedRevenue = 0;
+			// Выручка за текущий месяц от всех заселённых гостей — показывается в карточке.
+			double monthlyCheckedInRevenue = 0;
+
+			DateTime today = DateTime.Today;
+			DateTime monthStart = new DateTime(today.Year, today.Month, 1);
+			DateTime monthEnd = monthStart.AddMonths(1);
 
 			// 1. Номера
 			var rooms = new CRoom[1000];
@@ -99,15 +159,17 @@ namespace HotelApp.ViewModels
 				else if (r.Status == 1)
 				{
 					OccupiedRooms++;
-					// Выручка по текущим заселениям
+					// Выручка по текущим заселениям (для общей суммы за всё время)
 					if (TryGetStayRevenue(r, out double stayRevenue))
-						ExpectedRevenue += stayRevenue;
+						allExpectedRevenue += stayRevenue;
+					// Часть проживания, приходящаяся на текущий месяц
+					if (TryGetMonthRevenue(r, monthStart, monthEnd, out double monthRevenue))
+						monthlyCheckedInRevenue += monthRevenue;
 				}
 				else if (r.Status == 2) CleaningRooms++;
 			}
 
 			// 2. Бронирования
-			DateTime today = DateTime.Today;
 			var bookings = new CBooking[1000];
 			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
 
@@ -138,8 +200,8 @@ namespace HotelApp.ViewModels
 					bookingIn.Date < stayOut.Date && stayIn.Date < bookingOut.Date)
 					continue;
 
-				// Добавляем в ожидаемую выручку
-				ExpectedRevenue += room.BasePrice * days;
+				// Добавляем в полную ожидаемую выручку (для общей суммы за всё время)
+				allExpectedRevenue += room.BasePrice * days;
 
 				// Данные для графиков
 				string monthLabel = bookingIn.ToString("MMM yyyy", new CultureInfo("ru-RU"));
@@ -163,27 +225,29 @@ namespace HotelApp.ViewModels
 			var sortedMonths = revenueByMonth.Keys
 				.OrderBy(k => DateTime.ParseExact("01 " + k, "dd MMM yyyy", new CultureInfo("ru-RU")))
 				.ToArray();
-			MonthLabels = sortedMonths;
 
 			// 4. Формируем данные для графиков
+			var primaryBrush = (Brush)System.Windows.Application.Current.FindResource("PrimaryHueMidBrush");
+			var secondaryBrush = (Brush)System.Windows.Application.Current.FindResource("SecondaryHueMidBrush");
+
+			MonthLabels = sortedMonths;
+
+			// Диапазон оси один и тот же для столбцов и линий — при переключении
+			// график не смещается, а крайние месяцы остаются внутри области.
+			AxisMaxValue = sortedMonths.Length > 0
+				? sortedMonths.Length + 0.5
+				: double.NaN;
+
 			RevenueSeries = new SeriesCollection
 			{
-				new ColumnSeries
-				{
-					Title = "Выручка",
-					Values = new ChartValues<double>(sortedMonths.Select(m => revenueByMonth[m])),
-					Fill = (Brush)System.Windows.Application.Current.FindResource("PrimaryHueMidBrush")
-				}
+				BuildSeries("Выручка",
+					sortedMonths.Select(m => revenueByMonth[m]), primaryBrush)
 			};
 
 			OccupancySeries = new SeriesCollection
 			{
-				new ColumnSeries
-				{
-					Title = "Кол-во броней",
-					Values = new ChartValues<double>(sortedMonths.Select(m => (double)countByMonth[m])),
-					Fill = (Brush)System.Windows.Application.Current.FindResource("SecondaryHueMidBrush")
-				}
+				BuildSeries("Кол-во броней",
+					sortedMonths.Select(m => (double)countByMonth[m]), secondaryBrush)
 			};
 
 			RoomTypeSeries = new SeriesCollection
@@ -200,8 +264,11 @@ namespace HotelApp.ViewModels
 			// 6. Процент загрузки
 			OccupancyPercent = TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
 
-			// 7. Общая выручка
-			TotalRevenue = NativeMethods.Hotel_GetTotalRevenue(_hotelPtr) + ExpectedRevenue;
+			// Карточка: выручка за текущий месяц от всех заселённых гостей
+			ExpectedRevenue = monthlyCheckedInRevenue;
+
+			// 7. Общая выручка за всё время: накопленная + полная ожидаемая
+			TotalRevenue = NativeMethods.Hotel_GetTotalRevenue(_hotelPtr) + allExpectedRevenue;
 
 			OnPropertyChanged(string.Empty);
 		}
@@ -218,10 +285,65 @@ namespace HotelApp.ViewModels
 			return true;
 		}
 
+		// Выручка заселённого гостя, приходящаяся на указанный период (месяц).
+		private static bool TryGetMonthRevenue(CRoom room, DateTime periodStart, DateTime periodEnd, out double revenue)
+		{
+			revenue = 0;
+			if (!DateTime.TryParse(room.CheckInDate, out var dateIn) ||
+				!DateTime.TryParse(room.CheckOutDate, out var dateOut))
+				return false;
+
+			DateTime from = dateIn.Date > periodStart ? dateIn.Date : periodStart;
+			DateTime to = dateOut.Date < periodEnd ? dateOut.Date : periodEnd;
+			int days = (to - from).Days;
+			if (days <= 0) return false;
+
+			revenue = room.BasePrice * days;
+			return true;
+		}
+
+		// Создаёт серию нужного типа: столбцы или линию.
+		private Series BuildSeries(string title, IEnumerable<double> values, Brush color)
+		{
+			var chartValues = new ChartValues<double>(values);
+
+			if (!_isLineChart)
+			{
+				return new ColumnSeries
+				{
+					Title = title,
+					Values = chartValues,
+					Fill = color
+				};
+			}
+
+			return new LineSeries
+			{
+				Title = title,
+				Values = chartValues,
+				Stroke = color,
+				Fill = Brushes.Transparent,
+				PointGeometrySize = 9,
+				StrokeThickness = 2.5,
+				LineSmoothness = 0.3
+			};
+		}
+
+		// Топ гостей по сумме (проживания + брони). Используется экспортом отчёта.
+		public List<GuestModel> GetTopGuests(int count)
+		{
+			if (count <= 0) return new List<GuestModel>();
+
+			return GuestsViewModel.LoadSnapshot(_hotelPtr)
+				.Where(g => g.TotalRevenue > 0)
+				.OrderByDescending(g => g.TotalRevenue)
+				.ThenByDescending(g => g.TotalDays)
+				.Take(count)
+				.ToList();
+		}
+
 		private void ShowRoomTypeDetails(string typeName)
 		{
-			SelectedTypeGuests.Clear();
-
 			// Определяем числовой тип: 0 - Стандарт, 1 - Люкс, 2 - Конференц-зал
 			int targetType = 0;
 			if (typeName == "Люкс") targetType = 1;
@@ -231,8 +353,11 @@ namespace HotelApp.ViewModels
 			var rooms = new CRoom[1000];
 			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
 
-			var roomTypeDict = new Dictionary<int, int>();
-			var roomNumberDict = new Dictionary<int, string>();
+			var roomTypeDict = new Dictionary<int, int>(roomCount);
+			var roomNumberDict = new Dictionary<int, string>(roomCount);
+
+			// Сразу оцениваем размер результата, чтобы не перевыделять память.
+			var items = new List<RoomTypeDetailsModel>(roomCount);
 
 			for (int i = 0; i < roomCount; i++)
 			{
@@ -242,12 +367,12 @@ namespace HotelApp.ViewModels
 				// Текущие проживания
 				if (rooms[i].Type == targetType && rooms[i].Status == 1)
 				{
-					SelectedTypeGuests.Add(new RoomTypeDetailsModel
+					items.Add(new RoomTypeDetailsModel
 					{
 						GuestName = rooms[i].GuestName,
 						Passport = rooms[i].GuestPassport,
 						RoomNumber = rooms[i].Number,
-						DatesDisplay = $"{rooms[i].CheckInDate} - {rooms[i].CheckOutDate}"
+						DatesDisplay = rooms[i].CheckInDate + " - " + rooms[i].CheckOutDate
 					});
 				}
 			}
@@ -262,15 +387,18 @@ namespace HotelApp.ViewModels
 				{
 					string roomNum = roomNumberDict.TryGetValue(bookings[i].RoomId, out string num) ? num : "?";
 
-					SelectedTypeGuests.Add(new RoomTypeDetailsModel
+					items.Add(new RoomTypeDetailsModel
 					{
 						GuestName = bookings[i].GuestName,
 						Passport = bookings[i].Passport,
 						RoomNumber = roomNum,
-						DatesDisplay = $"{bookings[i].CheckInDate} - {bookings[i].CheckOutDate}"
+						DatesDisplay = bookings[i].CheckInDate + " - " + bookings[i].CheckOutDate
 					});
 				}
 			}
+
+			// Одна операция вместо Clear + Add на каждый элемент: таблица не дёргается.
+			SelectedTypeGuests = new ObservableCollection<RoomTypeDetailsModel>(items);
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;

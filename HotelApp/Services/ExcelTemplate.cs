@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using HotelApp.ViewModels;
 
 namespace HotelApp.Services
 {
-	// Генератор демонстрационного шаблона на 20 гостей
+	// Генератор шаблона и экспорт таблицы гостей в формате импорта Excel
 	public static class ExcelTemplate
 	{
 		public const string DefaultFileName = "Шаблон_гостей_20_чел.xlsx";
@@ -11,6 +12,45 @@ namespace HotelApp.Services
 		public static void Save(string path)
 		{
 			XlsxFile.Write(path, "Гости", ExcelImportService.Headers, BuildDemoRows());
+		}
+
+		// Сохраняет текущие данные гостей (все проживания/брони) в таблицу Excel,
+		// совместимую с импортом. Если записей нет — сохраняется пустая таблица с шапкой.
+		public static void SaveCurrentData(string path, IntPtr hotelPtr)
+		{
+			XlsxFile.Write(path, "Гости", ExcelImportService.Headers, BuildCurrentDataRows(hotelPtr));
+		}
+
+		public static List<object[]> BuildCurrentDataRows(IntPtr hotelPtr)
+		{
+			var guests = GuestsViewModel.LoadSnapshot(hotelPtr);
+			var rows = new List<object[]>();
+			int number = 0;
+
+			foreach (var guest in guests)
+			{
+				if (guest.StayHistory == null) continue;
+				foreach (var stay in guest.StayHistory)
+				{
+					number++;
+					double pricePerDay = stay.Days > 0 ? stay.Revenue / stay.Days : 0;
+
+					rows.Add(new object[]
+					{
+						number,
+						guest.FullName ?? string.Empty,
+						guest.Passport ?? string.Empty,
+						stay.BuildingName ?? string.Empty,
+						stay.RoomTypeText ?? "Стандарт",
+						stay.RoomNumber ?? string.Empty,
+						pricePerDay,
+						stay.CheckIn.Date,
+						stay.CheckOut.Date
+					});
+				}
+			}
+
+			return rows;
 		}
 
 		public static List<object[]> BuildDemoRows()

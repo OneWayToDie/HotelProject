@@ -3,8 +3,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
-    <materialDesign:Card Width="600" Padding="24" UniformCornerRadius="12">
-        <StackPanel>
+    <materialDesign:Card Width="600" Padding="0" UniformCornerRadius="12" MaxHeight="720">
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Прокручиваемое содержимое -->
+                <RowDefinition Height="*"/>
+                <!-- Закреплённый низ: статус и кнопки всегда на виду -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" Margin="24,24,24,12"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
             <!-- Заголовок -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                 <materialDesign:PackIcon Kind="CogOutline" Width="28" Height="28"
@@ -38,40 +48,75 @@
                                            FontSize="14" VerticalAlignment="Center"/>
 
                                 <!-- Текущая комбинация -->
-                                <TextBox Grid.Column="1"
-                                    Text="{Binding Gesture, UpdateSourceTrigger=PropertyChanged}"
-                                    IsReadOnly="True"
-                                    IsHitTestVisible="True"
-                                    Focusable="True"          
-                                    IsTabStop="True" 
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Foreground="{DynamicResource PrimaryHueMidBrush}"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    Padding="8,6"
-                                    Background="White"
-                                    BorderBrush="#E0E0E0"
-                                    BorderThickness="1"
-                                    CaretIndex="0"
-                                    Tag="{Binding}">
-                                    <!-- ВАЖНО: передает ту же ссылку на объект, что и кнопка -->
-                                    <TextBox.Style>
-                                        <Style TargetType="TextBox">
-                                            <Setter Property="BorderBrush" Value="#E0E0E0"/>
-                                            <Setter Property="BorderThickness" Value="1"/>
-                                            <Setter Property="Background" Value="White"/>
-                                            <Setter Property="Cursor" Value="IBeam"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}"/>
-                                                    <Setter Property="BorderThickness" Value="2"/>
-                                                    <Setter Property="Background" Value="#FFF9E6"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBox.Style>
-                                </TextBox>
+                                <Grid Grid.Column="1">
+                                    <TextBox
+                                        Text="{Binding Gesture, UpdateSourceTrigger=PropertyChanged}"
+                                        IsReadOnly="True"
+                                        IsHitTestVisible="True"
+                                        Focusable="True"          
+                                        IsTabStop="True" 
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource PrimaryHueMidBrush}"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Padding="8,6"
+                                        Background="White"
+                                        BorderBrush="#E0E0E0"
+                                        BorderThickness="1"
+                                        Tag="{Binding}">
+                                        <!-- ВАЖНО: передает ту же ссылку на объект, что и кнопка -->
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox">
+                                                <Setter Property="BorderBrush" Value="#E0E0E0"/>
+                                                <Setter Property="BorderThickness" Value="1"/>
+                                                <Setter Property="Background" Value="White"/>
+                                                <Setter Property="Cursor" Value="IBeam"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                                                        <Setter Property="BorderThickness" Value="2"/>
+                                                        <Setter Property="Background" Value="#FFF9E6"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
+
+                                    <!-- Мигающая каретка: WPF не рисует её в read-only TextBox,
+                                         поэтому имитируем визуально (поле во время записи пустое). -->
+                                    <Rectangle Tag="Caret"
+                                               Width="1.5" Height="16"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Fill="{DynamicResource PrimaryHueMidBrush}"
+                                               IsHitTestVisible="False">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard x:Name="CaretBlinkStoryboard">
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     From="1" To="0"
+                                                                                     Duration="0:0:0.53"
+                                                                                     AutoReverse="True"
+                                                                                     RepeatBehavior="Forever"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <RemoveStoryboard BeginStoryboardName="CaretBlinkStoryboard"/>
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                </Grid>
 
                                 <!-- Кнопка записи -->
                                 <Button Grid.Column="2" Content="Записать"
@@ -85,22 +130,84 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Статус -->
-            <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="Gray"
-                       Margin="0,12,0,0" MinHeight="18"/>
+            <!-- ОФОРМЛЕНИЕ -->
+            <Separator Margin="0,16,0,12"/>
 
-            <!-- Кнопки действий -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                <Button Content="По умолчанию"
-                        Style="{StaticResource MaterialDesignFlatButton}"
-                        Click="Reset_Click" Margin="0,0,10,0"/>
-                <Button Content="Сохранить"
-                        Style="{StaticResource MaterialDesignRaisedButton}"
-                        Click="Save_Click" Margin="0,0,10,0"/>
-                <Button Content="Закрыть"
-                        Style="{StaticResource MaterialDesignFlatButton}"
-                        Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}"/>
+            <TextBlock Text="Оформление" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <TextBlock Text="Цветовая тема" FontSize="12" Foreground="Gray" Margin="0,0,0,8"/>
+
+            <UniformGrid x:Name="ThemePanel" Columns="4" Margin="0,0,0,10">
+                <RadioButton GroupName="AppTheme" Tag="Indigo" Margin="0,0,6,0"
+                             Style="{StaticResource MaterialDesignChoiceChipRadioButton}"
+                             Checked="Theme_Checked" HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="12" Height="12" Fill="#3F51B5" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Индиго" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton GroupName="AppTheme" Tag="Emerald" Margin="0,0,6,0"
+                             Style="{StaticResource MaterialDesignChoiceChipRadioButton}"
+                             Checked="Theme_Checked" HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="12" Height="12" Fill="#2E7D32" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Изумруд" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton GroupName="AppTheme" Tag="Ruby" Margin="0,0,6,0"
+                             Style="{StaticResource MaterialDesignChoiceChipRadioButton}"
+                             Checked="Theme_Checked" HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="12" Height="12" Fill="#C62828" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Рубин" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton GroupName="AppTheme" Tag="Amber"
+                             Style="{StaticResource MaterialDesignChoiceChipRadioButton}"
+                             Checked="Theme_Checked" HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="12" Height="12" Fill="#FF8F00" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Янтарь" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+            </UniformGrid>
+
+            <CheckBox Content="Включить анимации"
+                      IsChecked="{Binding IsAnimationsEnabled, Mode=TwoWay}"
+                      ToolTip="Плавное появление вкладок и карточек"
+                      Margin="0,0,0,4"/>
+
             </StackPanel>
-        </StackPanel>
+        </ScrollViewer>
+
+            <!-- ЗАКРЕПЛЁННЫЙ НИЗ: статус и кнопки не участвуют в прокрутке -->
+            <Border Grid.Row="1" Padding="24,12,24,16"
+                    Background="#FAFAFA" BorderBrush="#E6E6E6" BorderThickness="0,1,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="{Binding StatusMessage}" FontSize="12"
+                               Foreground="Gray" TextWrapping="Wrap" MinHeight="18"
+                               Margin="0,0,0,8"/>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="По умолчанию"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Click="Reset_Click" Margin="0,0,10,0"/>
+                        <Button Content="Сохранить"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Click="Save_Click" Margin="0,0,10,0"/>
+                        <Button Content="Закрыть"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </materialDesign:Card>
 </UserControl>

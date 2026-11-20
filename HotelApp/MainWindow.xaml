@@ -277,6 +277,12 @@
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal"
                       FontSize="13"
+                      RowHeight="30"
+                      EnableRowVirtualization="True"
+                      EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
@@ -464,16 +470,27 @@
                             </StackPanel>
                         </StackPanel>
                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <!-- Шаблон -->
-                            <Button Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,5,0" Click="ExportTemplate_Click" ToolTip="Скачать шаблон Excel">
+                            <!-- Индикатор состояния базы данных: зелёный — успех, красный — ошибка -->
+                            <Border Margin="0,0,10,0" Padding="10,6" CornerRadius="12" Background="#F5F5F5"
+                                    VerticalAlignment="Center" ToolTip="{Binding DatabaseStatusToolTip}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse x:Name="DatabaseStatusDot" Width="10" Height="10" Fill="{Binding DatabaseStatusBrush}"
+                                             VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding DatabaseStatusText}" FontSize="11"
+                                               Foreground="Gray" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Сохранить таблицу -->
+                            <Button Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,5,0" Click="ExportTemplate_Click" ToolTip="Сохранить таблицу Excel (по умолчанию — в папку программы)">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="FileDocumentOutline" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Шаблон" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Сохранить таблицу" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <!-- Импорт -->
-                            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,5,0" Click="ImportExcel_Click" ToolTip="Загрузить данные из Excel">
+                            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,5,0" Click="ImportExcel_Click" ToolTip="Загрузить данные из Excel (по умолчанию — из папки программы)">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="FileExcelOutline" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="Импорт Excel" VerticalAlignment="Center"/>
@@ -507,8 +524,13 @@
                     </Grid>
                 </Border>
 
-                <!-- ОБЛАСТЬ КОНТЕНТА -->
-                <ContentControl Grid.Row="1" Content="{Binding CurrentView}"/>
+                <!-- ОБЛАСТЬ КОНТЕНТА: плавное появление вкладок -->
+                <materialDesign:TransitioningContent x:Name="MainContent" Grid.Row="1"
+                                                     Content="{Binding CurrentView}">
+                    <materialDesign:TransitioningContent.OpeningEffect>
+                        <materialDesign:TransitionEffect Kind="FadeIn" Duration="0:0:0.28"/>
+                    </materialDesign:TransitioningContent.OpeningEffect>
+                </materialDesign:TransitioningContent>
 
                 <!-- ЖУРНАЛ -->
                 <Border Grid.Row="2" Background="#1E1E1E" Padding="15">
@@ -524,6 +546,11 @@
                     </ListBox>
                 </Border>
             </Grid>
+
+            <!-- ВСПЛЫВАЮЩИЕ УВЕДОМЛЕНИЯ (TOAST) -->
+            <StackPanel x:Name="ToastHost" Grid.ColumnSpan="2" Panel.ZIndex="150"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Margin="0,0,24,24" IsHitTestVisible="False"/>
 
             <!-- ОВЕРЛЕЙ ИМПОРТА EXCEL (Восстановлен!) -->
             <Grid x:Name="ImportOverlay" Grid.ColumnSpan="2" Panel.ZIndex="100" Visibility="Collapsed" KeyDown="ImportOverlay_KeyDown">

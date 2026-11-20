@@ -40,14 +40,37 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="Auto" MinWidth="50"/>
 
-                    <DataGridTextColumn Header="ФИО Гостя" Binding="{Binding FullName}" Width="Auto" MinWidth="220" MaxWidth="430">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="ToolTip" Value="{Binding FullName}"/>
-                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                    <DataGridTemplateColumn Header="ФИО Гостя" Width="Auto" MinWidth="220" MaxWidth="430">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            ToolTip="{Binding FullName}">
+                                    <!-- Звезда VIP-гостя -->
+                                    <materialDesign:PackIcon Kind="Star"
+                                                             Width="16" Height="16"
+                                                             Foreground="Gold"
+                                                             Margin="0,0,6,0"
+                                                             VerticalAlignment="Center"
+                                                             ToolTip="{Binding VipToolTip}">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsVip}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+
+                                    <TextBlock Text="{Binding FullName}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTextColumn Header="Паспорт" Binding="{Binding Passport}" Width="Auto" MinWidth="110"/>
                     <!-- ДАТА ПРОЖИВАНИЯ -->

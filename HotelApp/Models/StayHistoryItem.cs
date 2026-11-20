@@ -23,6 +23,7 @@ namespace HotelApp.Models
 		public int Days { get; set; }
 		public string BuildingName { get; set; } = string.Empty;
 		public string RoomNumber { get; set; } = string.Empty;
+		public string RoomTypeText { get; set; } = string.Empty;
 		public double Revenue { get; set; }
 		public StayStatus Status { get; set; }
 

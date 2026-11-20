@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using HotelApp.Models;
 using HotelApp.Services;
 using HotelApp.ViewModels;
@@ -40,6 +41,28 @@ namespace HotelApp.Views
 			catch (Exception ex)
 			{
 				ReportError("заселение гостя", ex);
+			}
+		}
+
+		private async void RoomsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+		{
+			try
+			{
+				var row = ItemsControl.ContainerFromElement(RoomsGrid, e.OriginalSource as DependencyObject) as DataGridRow;
+				if (row == null) return;
+
+				var room = row.Item as RoomModel;
+				if (room == null) return;
+
+				// Заселение по двойному клику — только для номеров, которые уже можно заселить сейчас.
+				if (room.Status != 0 || !room.IsWaitingForCheckIn) return;
+
+				RoomsGrid.SelectedItem = room;
+				await CheckInAsync();
+			}
+			catch (Exception ex)
+			{
+				ReportError("заселение гостя по двойному клику", ex);
 			}
 		}
 

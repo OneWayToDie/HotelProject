@@ -13,6 +13,10 @@ namespace HotelApp.ViewModels
 {
 	public class GuestsViewModel : INotifyPropertyChanged
 	{
+		// Порог VIP-статуса: больше 100 000 ₽ или больше 5 суток
+		private const double VipRevenueThreshold = 100000;
+		private const int VipDaysThreshold = 5;
+
 		private IntPtr _hotelPtr;
 		private MainViewModel _mainVm;
 		private string _searchText = string.Empty;
@@ -38,12 +42,29 @@ namespace HotelApp.ViewModels
 			RefreshData();
 		}
 
+		// Снимок всех гостей с агрегатами по проживаниям и броням — для отчётов.
+		// Без записи в журнал и модальных окон: исключение обрабатывает вызывающий код.
+		public static List<GuestModel> LoadSnapshot(IntPtr hotelPtr)
+		{
+			var vm = new GuestsViewModel(hotelPtr, null, false);
+			vm.LoadGuests();
+			return vm.Guests.ToList();
+		}
+
+		private GuestsViewModel(IntPtr hotelPtr, MainViewModel mainVm, bool load)
+		{
+			_hotelPtr = hotelPtr;
+			_mainVm = mainVm;
+			if (load) RefreshData();
+		}
+
 		public void RefreshData()
 		{
 			try { LoadGuests(); }
 			catch (Exception ex)
 			{
-				_mainVm.AddLog("База гостей: не удалось загрузить данные. " + ex.Message, LogType.Error);
+				if (_mainVm != null)
+					_mainVm.AddLog("База гостей: не удалось загрузить данные. " + ex.Message, LogType.Error);
 				AppDialog.Error("Не удалось загрузить список гостей.\n" + ex.Message, "База гостей");
 			}
 		}
@@ -54,8 +75,8 @@ namespace HotelApp.ViewModels
 			var buffer = new CGuest[max];
 			int count = NativeMethods.Hotel_GetAllGuests(_hotelPtr, buffer, max);
 
-			// 1. Справочник номеров: roomId -> (buildingName, roomNumber, basePrice)
-			var roomInfo = new Dictionary<int, (string Building, string Number, double Price)>();
+			// 1. Справочник номеров: roomId -> (buildingName, roomNumber, basePrice, typeText)
+			var roomInfo = new Dictionary<int, (string Building, string Number, double Price, string TypeText)>();
 			var rooms = new CRoom[max];
 			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, max);
 			var buildings = new Dictionary<int, string>();
@@ -66,7 +87,8 @@ namespace HotelApp.ViewModels
 			for (int i = 0; i < roomCount; i++)
 			{
 				string bName = buildings.TryGetValue(rooms[i].BuildingId, out string n) ? n : $"Корпус {rooms[i].BuildingId}";
-				roomInfo[rooms[i].Id] = (bName, rooms[i].Number, rooms[i].BasePrice);
+				string typeText = rooms[i].Type == 1 ? "Люкс" : (rooms[i].Type == 2 ? "Конференц-зал" : "Стандарт");
+				roomInfo[rooms[i].Id] = (bName, rooms[i].Number, rooms[i].BasePrice, typeText);
 			}
 
 			// 2. Собираем историю по каждому гостю (проживания + брони)
@@ -117,6 +139,9 @@ namespace HotelApp.ViewModels
 				guest.TotalRevenue = totalRevenue;
 				guest.LastRoomInfo = ComputeLastRoomInfo(history);
 
+				// VIP: больше 100 000 ₽ или больше 5 суток проживания
+				guest.IsVip = totalRevenue > VipRevenueThreshold || totalDays > VipDaysThreshold;
+
 				// Старые свойства (для совместимости, если где-то используются)
 				var nearest = PickNearest(history);
 				guest.StayDisplay = nearest != null
@@ -129,7 +154,7 @@ namespace HotelApp.ViewModels
 
 		// Собирает историю проживаний и броней по ключу гостя
 		private Dictionary<string, List<StayHistoryItem>> BuildHistory(
-			Dictionary<int, (string Building, string Number, double Price)> roomInfo)
+			Dictionary<int, (string Building, string Number, double Price, string TypeText)> roomInfo)
 		{
 			var result = new Dictionary<string, List<StayHistoryItem>>(StringComparer.OrdinalIgnoreCase);
 			var today = DateTime.Today;
@@ -158,6 +183,7 @@ namespace HotelApp.ViewModels
 					Days = days,
 					BuildingName = info.Building,
 					RoomNumber = info.Number,
+					RoomTypeText = info.TypeText,
 					Revenue = info.Price * days,
 					Status = StayStatus.Current
 				});
@@ -194,6 +220,7 @@ namespace HotelApp.ViewModels
 					Days = days,
 					BuildingName = info.Building,
 					RoomNumber = info.Number,
+					RoomTypeText = info.TypeText,
 					Revenue = info.Price * days,
 					Status = status
 				});

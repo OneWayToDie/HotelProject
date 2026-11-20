@@ -51,7 +51,8 @@
                 BorderBrush="{DynamicResource MaterialDesignDivider}"
                 BorderThickness="1">
             <DataGrid x:Name="RoomsGrid" ItemsSource="{Binding Rooms}" AutoGenerateColumns="False" IsReadOnly="True"
-                      CanUserAddRows="False" HeadersVisibility="Column">
+                      CanUserAddRows="False" HeadersVisibility="Column"
+                      MouseDoubleClick="RoomsGrid_MouseDoubleClick">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Номер" Binding="{Binding Number}" Width="80" MinWidth="70"/>
                     <DataGridTextColumn Header="Тип" Binding="{Binding TypeText}" Width="165" MinWidth="150"/>

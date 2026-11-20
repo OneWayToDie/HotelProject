@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -10,9 +11,53 @@ namespace HotelApp.Views
 {
 	public partial class SettingsView : UserControl
 	{
+		// Пока выставляем галочку темы программно, не применяем её повторно.
+		private bool _syncingTheme;
+
 		public SettingsView()
 		{
 			InitializeComponent();
+			Loaded += SettingsView_Loaded;
+		}
+
+		private void SettingsView_Loaded(object sender, RoutedEventArgs e)
+		{
+			SyncThemeButtons();
+		}
+
+		// Синхронизирует выбранную радиокнопку с темой из ViewModel.
+		private void SyncThemeButtons()
+		{
+			var vm = DataContext as SettingsViewModel;
+			if (vm == null || ThemePanel == null) return;
+
+			_syncingTheme = true;
+			try
+			{
+				foreach (var child in ThemePanel.Children)
+				{
+					var radio = child as RadioButton;
+					if (radio == null) continue;
+					radio.IsChecked = string.Equals(radio.Tag as string, vm.SelectedTheme,
+						StringComparison.OrdinalIgnoreCase);
+				}
+			}
+			finally
+			{
+				_syncingTheme = false;
+			}
+		}
+
+		private void Theme_Checked(object sender, RoutedEventArgs e)
+		{
+			if (_syncingTheme) return;
+
+			var vm = DataContext as SettingsViewModel;
+			var radio = sender as RadioButton;
+			if (vm == null || radio == null || radio.IsChecked != true) return;
+
+			if (radio.Tag is string themeName)
+				vm.SelectTheme(themeName);
 		}
 
 		private void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -21,23 +66,29 @@ namespace HotelApp.Views
 			{
 				vm.StartRecording(setting);
 
-				// Render гарантированно ждёт ПОЛНОЙ отрисовки визуального дерева
+				// Input выполняется уже после отрисовки (Render -> Loaded -> Input),
+				// поэтому TextBox к этому моменту гарантированно существует в дереве.
 				Dispatcher.InvokeAsync(() =>
 				{
 					var textBox = FindTextBoxForSetting(setting);
 					if (textBox != null)
 					{
-						// FocusManager надежнее, чем Keyboard.Focus, внутри DataTemplate
 						FocusManager.SetFocusedElement(this, textBox);
-						textBox.CaretIndex = 0;
+						// IsReadOnlyCaretVisible=True рисует каретку в read-only TextBox,
+						// но только когда у него реальный клавиатурный фокус.
+						textBox.Focus();
+						Keyboard.Focus(textBox);
+						textBox.CaretIndex = (textBox.Text ?? string.Empty).Length;
+						textBox.ScrollToEnd();
 					}
 					else
 					{
 						// Фолбэк: если WPF упрямится и не находит TextBox, 
 						// фокусируем сам UserControl. OnPreviewKeyDown всё равно перехватит клавиши!
 						FocusManager.SetFocusedElement(this, this);
+						Focus();
 					}
-				}, DispatcherPriority.Render);
+				}, DispatcherPriority.Input);
 			}
 		}
 
@@ -88,12 +139,25 @@ namespace HotelApp.Views
 			=> (DataContext as SettingsViewModel)?.Save();
 
 		private void Reset_Click(object sender, RoutedEventArgs e)
-			=> (DataContext as SettingsViewModel)?.ResetToDefaults();
+		{
+			var vm = DataContext as SettingsViewModel;
+			if (vm == null) return;
+
+			vm.ResetToDefaults();
+			SyncThemeButtons();
+		}
 
 		protected override void OnPreviewKeyDown(KeyEventArgs e)
 		{
 			base.OnPreviewKeyDown(e);
-			(DataContext as SettingsViewModel)?.HandleKeyDown(e);
+
+			var vm = DataContext as SettingsViewModel;
+			if (vm == null) return;
+
+			// Пока идёт запись, клавиши принадлежат настройкам: не даём им
+			// нажимать кнопки, прокручивать список или закрывать диалог.
+			if (vm.HandleKeyDown(e))
+				e.Handled = true;
 		}
 	}
 }

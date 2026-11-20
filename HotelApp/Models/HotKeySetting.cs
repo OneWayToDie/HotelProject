@@ -23,8 +23,6 @@ namespace HotelApp.Models
 			{
 				_isRecording = value;
 				OnPropertyChanged();
-				// При начале записи очищаем поле
-				if (value) Gesture = "";
 			}
 		}
 

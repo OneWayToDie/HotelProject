@@ -42,6 +42,22 @@ namespace HotelApp.Models
 		public string TotalRevenueDisplay =>
 			_totalRevenue > 0 ? $"{_totalRevenue:N0} ₽" : "—";
 
+		// VIP-гость: принёс больше 100 000 ₽ или прожил больше 5 суток
+		private bool _isVip;
+		public bool IsVip
+		{
+			get => _isVip;
+			set
+			{
+				if (_isVip == value) return;
+				_isVip = value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(VipToolTip));
+			}
+		}
+
+		public string VipToolTip => _isVip ? "VIP-гость" : null;
+
 		// Последний/текущий номер (для основной строки)
 		private string _lastRoomInfo = "—";
 		public string LastRoomInfo

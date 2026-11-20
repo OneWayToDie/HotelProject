@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using HotelApp.ViewModels;
 using HotelApp.Views;
 using HotelApp.Services;
@@ -14,18 +18,173 @@ namespace HotelApp
 {
 	public partial class MainWindow : Window
 	{
+		// Вкладка, на которой пользователь был до открытия настроек
+		private int _lastMenuIndex;
+
 		public MainWindow()
 		{
 			InitializeComponent();
 			this.Loaded += MainWindow_Loaded;
+			this.Closed += MainWindow_Closed;
+
+			ToastService.ToastRequested += OnToastRequested;
+			AnimationService.Changed += OnAnimationSettingsChanged;
+		}
+
+		private void MainWindow_Closed(object sender, EventArgs e)
+		{
+			ToastService.ToastRequested -= OnToastRequested;
+			AnimationService.Changed -= OnAnimationSettingsChanged;
 		}
 
 		private void MainWindow_Loaded(object sender, RoutedEventArgs e)
 		{
+			ApplyAnimationSettings();
+
 			if (DataContext is MainViewModel vm)
 			{
 				// Регистрируем горячие клавиши
 				HotkeyService.Register(this, vm);
+			}
+		}
+
+		// Отключаем встроенные переходы MaterialDesign, если анимации выключены.
+		private void OnAnimationSettingsChanged()
+		{
+			if (!Dispatcher.CheckAccess())
+			{
+				Dispatcher.BeginInvoke(new Action(ApplyAnimationSettings));
+				return;
+			}
+
+			ApplyAnimationSettings();
+		}
+
+		private void ApplyAnimationSettings()
+		{
+			if (MainContent == null) return;
+			try
+			{
+				TransitionAssist.SetDisableTransitions(MainContent, !AnimationService.Enabled);
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Debug.WriteLine("Не удалось применить настройку анимаций: " + ex.Message);
+			}
+		}
+
+		// --- TOAST-УВЕДОМЛЕНИЯ ---
+
+		private void OnToastRequested(ToastMessage toast)
+		{
+			if (toast == null) return;
+
+			if (!Dispatcher.CheckAccess())
+			{
+				Dispatcher.BeginInvoke(new Action(() => OnToastRequested(toast)));
+				return;
+			}
+
+			ShowToast(toast);
+		}
+
+		private void ShowToast(ToastMessage toast)
+		{
+			try
+			{
+				Brush background;
+				PackIconKind iconKind;
+
+				switch (toast.Type)
+				{
+					case ToastType.Error:
+						background = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+						iconKind = PackIconKind.AlertCircle;
+						break;
+					case ToastType.Info:
+						background = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+						iconKind = PackIconKind.Information;
+						break;
+					default:
+						background = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+						iconKind = PackIconKind.CheckCircle;
+						break;
+				}
+
+				var icon = new PackIcon
+				{
+					Kind = iconKind,
+					Width = 20,
+					Height = 20,
+					Foreground = Brushes.White,
+					VerticalAlignment = VerticalAlignment.Center,
+					Margin = new Thickness(0, 0, 10, 0)
+				};
+
+				var text = new TextBlock
+				{
+					Text = toast.Text,
+					Foreground = Brushes.White,
+					FontSize = 13,
+					TextWrapping = TextWrapping.Wrap,
+					MaxWidth = 360,
+					VerticalAlignment = VerticalAlignment.Center
+				};
+
+				var content = new StackPanel { Orientation = Orientation.Horizontal };
+				content.Children.Add(icon);
+				content.Children.Add(text);
+
+				var card = new Border
+				{
+					Background = background,
+					CornerRadius = new CornerRadius(8),
+					Padding = new Thickness(14, 10, 16, 10),
+					Margin = new Thickness(0, 6, 0, 0),
+					HorizontalAlignment = HorizontalAlignment.Right,
+					Child = content,
+					Effect = new DropShadowEffect
+					{
+						BlurRadius = 14,
+						ShadowDepth = 2,
+						Opacity = 0.35,
+						Color = Colors.Black
+					}
+				};
+
+				// Не копим уведомления бесконечно
+				while (ToastHost.Children.Count >= 4)
+					ToastHost.Children.RemoveAt(0);
+
+				ToastHost.Children.Add(card);
+
+				if (AnimationService.Enabled)
+				{
+					var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180));
+					card.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+				}
+
+				var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
+				timer.Tick += (s, e) =>
+				{
+					timer.Stop();
+
+					if (AnimationService.Enabled)
+					{
+						var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250));
+						fadeOut.Completed += (s2, e2) => ToastHost.Children.Remove(card);
+						card.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+					}
+					else
+					{
+						ToastHost.Children.Remove(card);
+					}
+				};
+				timer.Start();
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Debug.WriteLine("Не удалось показать уведомление: " + ex.Message);
 			}
 		}
 
@@ -42,6 +201,17 @@ namespace HotelApp
 		{
 			if (DataContext is MainViewModel vm && MenuList != null)
 			{
+				// Настройки — не вкладка, а диалог: пункт меню не должен оставаться выбранным,
+				// иначе повторно открыть настройки не получится.
+				if (MenuList.SelectedIndex == 4)
+				{
+					OpenSettingsDialog();
+					return;
+				}
+
+				if (MenuList.SelectedIndex >= 0)
+					_lastMenuIndex = MenuList.SelectedIndex;
+
 				if (MenuList.SelectedIndex == 0) // Номера и Фонд
 					vm.CurrentView = new RoomsViewModel(vm.HotelPtr, vm);
 
@@ -53,9 +223,6 @@ namespace HotelApp
 
 				else if (MenuList.SelectedIndex == 3) // Карта отеля
 					vm.CurrentView = new MapView { DataContext = new MapViewModel(vm.HotelPtr) };
-
-				else if (MenuList.SelectedIndex == 4) // НАСТРОЙКИ
-					OpenSettingsDialog();
 			}
 		}
 
@@ -63,23 +230,76 @@ namespace HotelApp
 		private async void OpenSettingsDialog()
 		{
 			if (!(DataContext is MainViewModel vm)) return;
-			if (DialogHost.IsDialogOpen("RootDialog")) return;
 
-			var settingsView = new SettingsView
+			if (DialogHost.IsDialogOpen("RootDialog"))
 			{
-				DataContext = new SettingsViewModel(this, vm)
-			};
+				RestoreMenuSelection();
+				return;
+			}
 
-			// Ждем закрытия диалога
-			await DialogHost.Show(settingsView, "RootDialog");
+			try
+			{
+				var settingsView = new SettingsView
+				{
+					DataContext = new SettingsViewModel(this, vm)
+				};
 
-			// === ЖЁСТКИЙ ВОССТАНОВЛЕНИЕ ФОКУСА ===
-			// 1. Сбрасываем любой "залипший" фокус от DialogHost
-			Keyboard.ClearFocus();
+				// Ждем закрытия диалога
+				await DialogHost.Show(settingsView, "RootDialog");
+			}
+			catch (Exception ex)
+			{
+				vm.AddLog("Не удалось открыть настройки: " + ex.Message, LogType.Error);
+				AppDialog.Error("Не удалось открыть настройки.\n" + ex.Message, "Настройки");
+			}
+			finally
+			{
+				// Настройки — диалог, а не вкладка: возвращаем подсветку на прежнюю вкладку,
+				// чтобы её можно было открыть повторно.
+				RestoreMenuSelection();
+				RestoreFocus();
+			}
+		}
 
-			// 2. Возвращаем фокус главному окну
-			this.Focus();
-			Keyboard.Focus(this);
+		// Возвращает клавиатурный фокус главному окну после закрытия DialogHost:
+		// без Activate() окно может остаться неактивным, и горячие клавиши не работают.
+		private void RestoreFocus()
+		{
+			if (!IsLoaded) return;
+
+			try
+			{
+				Activate();
+				Keyboard.ClearFocus();
+
+				// Фокусируем меню: оно всегда есть и принимает клавиатуру.
+				if (MenuList != null && MenuList.IsVisible)
+				{
+					MenuList.Focus();
+					Keyboard.Focus(MenuList);
+				}
+				else
+				{
+					Focus();
+					Keyboard.Focus(this);
+				}
+			}
+			catch (Exception ex)
+			{
+				if (DataContext is MainViewModel vm)
+					vm.AddLog("Не удалось вернуть фокус главному окну: " + ex.Message, LogType.Error);
+			}
+		}
+
+		// Возвращает выбор в меню на вкладку, которая была открыта до настроек,
+		// не пересоздавая текущее представление.
+		private void RestoreMenuSelection()
+		{
+			if (MenuList == null) return;
+
+			MenuList.SelectionChanged -= MenuList_SelectionChanged;
+			MenuList.SelectedIndex = _lastMenuIndex;
+			MenuList.SelectionChanged += MenuList_SelectionChanged;
 		}
 
 		// --- ДОБАВЛЕНИЕ КОРПУСА ---
@@ -269,10 +489,14 @@ namespace HotelApp
 		{
 			if (!(DataContext is MainViewModel vm)) return;
 
+			string templatesDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates");
+			try { System.IO.Directory.CreateDirectory(templatesDir); } catch { }
+
 			var dialog = new OpenFileDialog
 			{
 				Title = "Выберите файл Excel с гостями",
-				Filter = "Книга Excel (*.xlsx)|*.xlsx|Все файлы (*.*)|*.*"
+				Filter = "Книга Excel (*.xlsx)|*.xlsx|Все файлы (*.*)|*.*",
+				InitialDirectory = System.IO.Directory.Exists(templatesDir) ? templatesDir : AppDomain.CurrentDomain.BaseDirectory
 			};
 
 			if (dialog.ShowDialog() != true) return;
@@ -416,26 +640,33 @@ namespace HotelApp
 			AppDialog.Info(message, "Импорт Excel");
 		}
 
-		// --- СОХРАНЕНИЕ ШАБЛОНА EXCEL ---
+		// --- СОХРАНЕНИЕ ТАБЛИЦЫ EXCEL (ТЕКУЩИЕ ДАННЫЕ ГОСТЕЙ) ---
 		private void ExportTemplate_Click(object sender, RoutedEventArgs e)
 		{
+			if (!(DataContext is MainViewModel vm)) return;
+
+			string templatesDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates");
+			try { System.IO.Directory.CreateDirectory(templatesDir); } catch { }
+
+			string defaultName = "Таблица_гостей_" + DateTime.Now.ToString("yyyy-MM-dd") + ".xlsx";
 			var dialog = new SaveFileDialog
 			{
-				Title = "Сохранить шаблон Excel",
+				Title = "Сохранить таблицу Excel",
 				Filter = "Книга Excel (*.xlsx)|*.xlsx",
-				FileName = ExcelTemplate.DefaultFileName
+				FileName = defaultName,
+				InitialDirectory = System.IO.Directory.Exists(templatesDir) ? templatesDir : AppDomain.CurrentDomain.BaseDirectory
 			};
 
 			if (dialog.ShowDialog() != true) return;
 
 			try
 			{
-				ExcelTemplate.Save(dialog.FileName);
-				AppDialog.Success("Шаблон сохранён:\n" + dialog.FileName, "Шаблон Excel");
+				ExcelTemplate.SaveCurrentData(dialog.FileName, vm.HotelPtr);
+				ToastService.Success("Таблица сохранена: " + System.IO.Path.GetFileName(dialog.FileName));
 			}
 			catch (Exception ex)
 			{
-				AppDialog.Error("Не удалось сохранить шаблон:\n" + ex.Message, "Шаблон Excel");
+				AppDialog.Error("Не удалось сохранить таблицу:\n" + ex.Message, "Сохранение таблицы");
 			}
 		}
 
@@ -465,8 +696,7 @@ namespace HotelApp
 				vm.SaveData();
 				vm.AddLog("База данных очищена. Созданы корпуса «Главный корпус» и «Корпус А».",
 					LogType.Success);
-				AppDialog.Success("База данных очищена.\nСозданы корпуса «Главный корпус» и «Корпус А».",
-					"Очистка базы данных");
+				ToastService.Success("База данных очищена. Созданы корпуса «Главный корпус» и «Корпус А».");
 			}
 			catch (Exception ex)
 			{

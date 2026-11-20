@@ -164,7 +164,7 @@ namespace HotelApp.ViewModels
 					RefreshData();
 					_mainVm.SaveData();
 					_mainVm.AddLog($"Выселение: {guestName} из номера {roomNumber}. Оплата: {price:C}", LogType.Success);
-					AppDialog.Success($"Гость выселен.\nК оплате: {price:C}", "Выселение");
+					ToastService.Success($"Гость выселен. К оплате: {price:N0} ₽");
 				}
 				else
 				{
@@ -190,7 +190,7 @@ namespace HotelApp.ViewModels
 				RefreshData();
 				_mainVm.SaveData();
 				_mainVm.AddLog($"Уборка: номер {roomNumber} снова свободен.", LogType.Success);
-				AppDialog.Success("Уборка завершена! Номер снова свободен.", "Успех");
+				ToastService.Success("Уборка завершена — номер снова свободен.");
 			}
 			catch (Exception ex)
 			{
@@ -247,7 +247,7 @@ namespace HotelApp.ViewModels
 					RefreshData();
 					_mainVm.SaveData(); // Сохраняем в файл
 					_mainVm.AddLog($"Заселение: {guestName} -> номер {roomNumber}, {inDate} - {outDate} ({days} дн.).", LogType.Success);
-					AppDialog.Success($"Гость {guestName} успешно заселен!", "Успех");
+					ToastService.Success($"Гость {guestName} заселён в номер {roomNumber}.");
 				}
 				else
 				{
@@ -276,8 +276,7 @@ namespace HotelApp.ViewModels
 					RefreshData();
 					_mainVm.SaveData();
 					_mainVm.AddLog($"Бронирование: {guestName} -> номер {roomNumber}, {inDate} - {outDate}.", LogType.Success);
-					AppDialog.Success($"Номер {roomNumber} забронирован на {guestName}\n{inDate} - {outDate}",
-						"Бронирование");
+					ToastService.Success($"Номер {roomNumber} забронирован: {guestName}, {inDate} — {outDate}.");
 				}
 				else
 				{

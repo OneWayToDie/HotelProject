@@ -18,6 +18,12 @@ namespace HotelApp.Services
 			{ "About", "F1" }
 		};
 
+		// Тема оформления: Indigo, Emerald, Ruby или Amber
+		public string Theme { get; set; } = ThemeService.DefaultTheme;
+
+		// Плавные анимации интерфейса (появление вкладок и карточек)
+		public bool EnableAnimations { get; set; } = true;
+
 		// Путь к файлу настроек (Вариант А: в папке с exe)
 		private static string FilePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
