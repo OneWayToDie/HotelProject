@@ -7,8 +7,6 @@ using HotelApp.Models;
 
 namespace HotelApp.Services
 {
-	// Чтение Excel-файла с гостями: заголовки ищутся по названиям,
-	// поэтому порядок колонок в файле не важен.
 	public static class ExcelImportService
 	{
 		public static readonly string[] Headers =
@@ -17,6 +15,7 @@ namespace HotelApp.Services
 			"Номер", "Цена за сутки", "Дата заезда", "Дата выезда"
 		};
 
+		// Читает данные гостей из Excel-файла и преобразует их в строки импорта.
 		public static List<ImportRow> Read(string path)
 		{
 			var sheet = XlsxFile.ReadFirstSheet(path);
@@ -82,12 +81,14 @@ namespace HotelApp.Services
 			return rows;
 		}
 
+		// Возвращает значение ячейки по индексу или пустую строку, если индекс недопустим.
 		private static string Get(string[] cells, int index)
 		{
 			if (cells == null || index < 0 || index >= cells.Length) return string.Empty;
 			return (cells[index] ?? string.Empty).Trim();
 		}
 
+		// Ищет индекс заголовка колонки по набору допустимых названий.
 		private static int IndexOf(List<string> headers, params string[] names)
 		{
 			foreach (var name in names)
@@ -98,6 +99,7 @@ namespace HotelApp.Services
 			return -1;
 		}
 
+		// Нормализует текст заголовка колонки для сопоставления.
 		private static string NormalizeHeader(string value)
 		{
 			if (string.IsNullOrWhiteSpace(value)) return string.Empty;
@@ -106,10 +108,7 @@ namespace HotelApp.Services
 				.Replace('ё', 'е')
 				.Replace('\u00A0', ' ');
 
-			// Отрезаем уточнения в скобках: "Цена за сутки (₽)" -> "Цена за сутки"
 			result = Regex.Replace(result, @"\([^)]*\)", " ");
-
-			// Убираем двоеточия, точки в конце и лишние пробелы
 			result = result.TrimEnd(':', '.', ' ');
 			result = Regex.Replace(result, @"\s+", " ");
 

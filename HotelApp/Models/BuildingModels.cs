@@ -9,13 +9,35 @@ namespace HotelApp.Models
 		private int _id;
 		private string _name;
 
-		public int Id { get => _id; set { _id = value; OnPropertyChanged(); } }
-		public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
+		// Получает или задаёт идентификатор корпуса.
+		public int Id
+		{
+			get => _id;
+			set
+			{
+				_id = value;
+				OnPropertyChanged();
+			}
+		}
 
-		// Сюда мы будем складывать номера этого корпуса (для дерева)
+		// Получает или задаёт название корпуса.
+		public string Name
+		{
+			get => _name;
+			set
+			{
+				_name = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Получает коллекцию номеров, принадлежащих корпусу.
 		public ObservableCollection<RoomModel> Rooms { get; set; } = new ObservableCollection<RoomModel>();
 
+		// Событие уведомления об изменении значения свойства.
 		public event PropertyChangedEventHandler PropertyChanged;
+
+		// Уведомляет подписчиков об изменении свойства.
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

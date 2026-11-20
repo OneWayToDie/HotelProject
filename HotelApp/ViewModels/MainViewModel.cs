@@ -10,42 +10,86 @@ namespace HotelApp.ViewModels
 {
 	public class MainViewModel : INotifyPropertyChanged
 	{
-		public IntPtr HotelPtr { get; private set; }
-		public ObservableCollection<LogEntry> EventLog { get; } = new ObservableCollection<LogEntry>();
-		public ObservableCollection<BuildingModel> Buildings { get; } = new ObservableCollection<BuildingModel>();
-
-		private object _currentView;
-		public object CurrentView
-		{
-			get => _currentView;
-			set { _currentView = value; OnPropertyChanged(); }
-		}
-
-		// --- РЕАЛЬНАЯ СТАТИСТИКА ---
-		private int _totalRooms;
-		public int TotalRooms { get => _totalRooms; set { _totalRooms = value; OnPropertyChanged(); } }
-
-		private int _freeRooms;
-		public int FreeRooms { get => _freeRooms; set { _freeRooms = value; OnPropertyChanged(); } }
-
-		private int _occupiedRooms;
-		public double OccupancyPercent => TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
-		public int OccupiedRooms { get => _occupiedRooms; set { _occupiedRooms = value; OnPropertyChanged(); } }
-
-		private double _revenueToday;
-		public double RevenueToday { get => _revenueToday; set { _revenueToday = value; OnPropertyChanged(); } }
-
-		// Путь к файлу сохранения (в папке с программой .exe)
-		private readonly string _dataFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotel_data.txt");
-
-		// --- ИНДИКАТОР СОСТОЯНИЯ БАЗЫ ДАННЫХ ---
-		// true — загрузка/сохранение прошли успешно, false — ошибка, null — база ещё не сохранялась.
-		private bool? _isDatabaseOk;
-
 		private static readonly Brush DatabaseOkBrush = CreateFrozenBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
 		private static readonly Brush DatabaseErrorBrush = CreateFrozenBrush(Color.FromRgb(0xC6, 0x28, 0x28));
 		private static readonly Brush DatabaseNewBrush = CreateFrozenBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
 
+		private readonly string _dataFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotel_data.txt");
+		private object _currentView;
+		private int _totalRooms;
+		private int _freeRooms;
+		private int _occupiedRooms;
+		private double _revenueToday;
+		private bool? _isDatabaseOk;
+
+		// Получает указатель на нативный объект отеля.
+		public IntPtr HotelPtr { get; private set; }
+
+		// Получает журнал событий приложения.
+		public ObservableCollection<LogEntry> EventLog { get; } = new ObservableCollection<LogEntry>();
+
+		// Получает коллекцию корпусов для использования в интерфейсе.
+		public ObservableCollection<BuildingModel> Buildings { get; } = new ObservableCollection<BuildingModel>();
+
+		// Получает или задаёт текущее активное представление.
+		public object CurrentView
+		{
+			get => _currentView;
+			set
+			{
+				_currentView = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Получает или задаёт общее количество номеров.
+		public int TotalRooms
+		{
+			get => _totalRooms;
+			set
+			{
+				_totalRooms = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Получает или задаёт количество свободных номеров.
+		public int FreeRooms
+		{
+			get => _freeRooms;
+			set
+			{
+				_freeRooms = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Получает или задаёт количество занятых номеров.
+		public int OccupiedRooms
+		{
+			get => _occupiedRooms;
+			set
+			{
+				_occupiedRooms = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Возвращает процент загрузки отеля.
+		public double OccupancyPercent => TotalRooms > 0 ? (OccupiedRooms * 100.0 / TotalRooms) : 0;
+
+		// Получает или задаёт значение выручки за текущий день.
+		public double RevenueToday
+		{
+			get => _revenueToday;
+			set
+			{
+				_revenueToday = value;
+				OnPropertyChanged();
+			}
+		}
+
+		// Получает текущее состояние подключения базы данных.
 		public bool? IsDatabaseOk
 		{
 			get => _isDatabaseOk;
@@ -60,33 +104,29 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Возвращает цвет индикатора состояния базы данных.
 		public Brush DatabaseStatusBrush =>
 			_isDatabaseOk == true ? DatabaseOkBrush :
 			_isDatabaseOk == false ? DatabaseErrorBrush : DatabaseNewBrush;
 
+		// Возвращает текст индикатора состояния базы данных.
 		public string DatabaseStatusText =>
 			_isDatabaseOk == true ? "БД: подключена" :
 			_isDatabaseOk == false ? "БД: ошибка" : "БД: новая";
 
+		// Возвращает подсказку для индикатора состояния базы данных.
 		public string DatabaseStatusToolTip =>
 			_isDatabaseOk == true ? "База данных загружена, сохранение работает.\n" + _dataFile :
 			_isDatabaseOk == false ? "Ошибка доступа к базе данных. Подробности — в журнале.\n" + _dataFile :
 			"Файл сохранения ещё не создан — данные сохранятся при первом изменении.\n" + _dataFile;
 
-		private static Brush CreateFrozenBrush(Color color)
-		{
-			var brush = new SolidColorBrush(color);
-			brush.Freeze();
-			return brush;
-		}
-
+		// Инициализирует главную модель представления и загружает данные приложения.
 		public MainViewModel()
 		{
 			try
 			{
 				HotelPtr = NativeMethods.Hotel_Create();
 
-				// Пытаемся загрузить данные при старте
 				if (NativeMethods.Hotel_Load(HotelPtr, _dataFile))
 				{
 					AddLog("Данные успешно загружены из файла.");
@@ -117,7 +157,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Обновить список корпусов для диалога добавления номера
+		// Обновляет список корпусов для использования в диалогах и представлениях.
 		public void RefreshBuildings()
 		{
 			try
@@ -137,7 +177,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// МЕТОД ПЕРЕСЧЕТА СТАТИСТИКИ
+		// Пересчитывает сводные показатели по номерам отеля.
 		public void UpdateStats()
 		{
 			try
@@ -148,8 +188,8 @@ namespace HotelApp.ViewModels
 				int free = 0, occupied = 0;
 				for (int i = 0; i < count; i++)
 				{
-					if (buffer[i].Status == 0) free++; // 0 = Свободен
-					else if (buffer[i].Status == 1) occupied++; // 1 = Занят
+					if (buffer[i].Status == 0) free++;
+					else if (buffer[i].Status == 1) occupied++;
 				}
 
 				TotalRooms = count;
@@ -164,7 +204,7 @@ namespace HotelApp.ViewModels
 			OnPropertyChanged(nameof(OccupancyPercent));
 		}
 
-		// Проверка: не заняты ли выбранные даты чужой бронью
+		// Проверяет наличие конфликтов бронирования для указанного номера и периода.
 		public bool HasBookingConflict(int roomId, string inDate, string outDate, string guestName = null, string passport = null)
 		{
 			try
@@ -178,36 +218,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		private bool CheckBookingConflict(int roomId, string inDate, string outDate, string guestName, string passport)
-		{
-			var buffer = new CBooking[1000];
-			int count = NativeMethods.Hotel_GetAllBookings(HotelPtr, buffer, 1000);
-
-			for (int i = 0; i < count; i++)
-			{
-				if (buffer[i].RoomId != roomId) continue;
-
-				// Заселение самого гостя, оформившего бронь, не блокируем
-				bool ownBooking = false;
-				if (!string.IsNullOrWhiteSpace(guestName) &&
-					string.Equals(buffer[i].GuestName, guestName, StringComparison.OrdinalIgnoreCase))
-					ownBooking = true;
-				if (!ownBooking && !string.IsNullOrWhiteSpace(passport) &&
-					string.Equals(buffer[i].Passport, passport, StringComparison.OrdinalIgnoreCase))
-					ownBooking = true;
-
-				if (ownBooking) continue;
-
-				// Пересечение интервалов [inDate, outDate) и [bookingIn, bookingOut)
-				if (string.CompareOrdinal(inDate, buffer[i].CheckOutDate) < 0 &&
-					string.CompareOrdinal(buffer[i].CheckInDate, outDate) < 0)
-					return true;
-			}
-
-			return false;
-		}
-
-		// ОБНОВЛЕННЫЙ МЕТОД ДОБАВЛЕНИЯ ЛОГА (принимает тип)
+		// Добавляет запись в журнал событий приложения.
 		public void AddLog(string message, LogType type = LogType.Info)
 		{
 			EventLog.Add(new LogEntry
@@ -218,12 +229,7 @@ namespace HotelApp.ViewModels
 			});
 		}
 
-		public event PropertyChangedEventHandler PropertyChanged;
-		protected void OnPropertyChanged([CallerMemberName] string name = null)
-		{
-			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-		}
-
+		// Сохраняет текущее состояние данных отеля в файл.
 		public void SaveData()
 		{
 			try
@@ -244,6 +250,51 @@ namespace HotelApp.ViewModels
 				IsDatabaseOk = false;
 				AddLog("Ошибка сохранения данных: " + ex.Message, LogType.Error);
 			}
+		}
+
+		// Выполняет проверку пересечения дат бронирований для указанного номера.
+		private bool CheckBookingConflict(int roomId, string inDate, string outDate, string guestName, string passport)
+		{
+			var buffer = new CBooking[1000];
+			int count = NativeMethods.Hotel_GetAllBookings(HotelPtr, buffer, 1000);
+
+			for (int i = 0; i < count; i++)
+			{
+				if (buffer[i].RoomId != roomId) continue;
+
+				bool ownBooking = false;
+				if (!string.IsNullOrWhiteSpace(guestName) &&
+					string.Equals(buffer[i].GuestName, guestName, StringComparison.OrdinalIgnoreCase))
+					ownBooking = true;
+				if (!ownBooking && !string.IsNullOrWhiteSpace(passport) &&
+					string.Equals(buffer[i].Passport, passport, StringComparison.OrdinalIgnoreCase))
+					ownBooking = true;
+
+				if (ownBooking) continue;
+
+				if (string.CompareOrdinal(inDate, buffer[i].CheckOutDate) < 0 &&
+					string.CompareOrdinal(buffer[i].CheckInDate, outDate) < 0)
+					return true;
+			}
+
+			return false;
+		}
+
+		// Создаёт замороженную кисть указанного цвета.
+		private static Brush CreateFrozenBrush(Color color)
+		{
+			var brush = new SolidColorBrush(color);
+			brush.Freeze();
+			return brush;
+		}
+
+		// Событие уведомления об изменении значения свойства.
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		// Уведомляет подписчиков об изменении свойства.
+		protected void OnPropertyChanged([CallerMemberName] string name = null)
+		{
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 		}
 	}
 }

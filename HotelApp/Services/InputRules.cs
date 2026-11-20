@@ -4,8 +4,6 @@ using System.Text.RegularExpressions;
 
 namespace HotelApp.Services
 {
-	// Единые правила проверки данных, которые вводит пользователь.
-	// Используются и диалогами, и импортом Excel.
 	public static class InputRules
 	{
 		public const int MaxFullNameLength = 100;
@@ -33,33 +31,32 @@ namespace HotelApp.Services
 			@"^\d{1,9}$",
 			RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-		// ФИО: только буквы, пробел и дефис. Цифры и знаки не допускаются.
+		// Нормализует строку ФИО, удаляя лишние пробелы по краям и внутри.
 		public static string NormalizeFullName(string value)
 		{
 			if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 			return Regex.Replace(value.Trim(), @"\s+", " ");
 		}
 
+		// Проверяет корректность введённого ФИО.
 		public static bool IsValidFullName(string value)
 		{
 			string text = NormalizeFullName(value);
 			return text.Length >= 2 && text.Length <= MaxFullNameLength && FullNameRegex.IsMatch(text);
 		}
 
-		// Паспорт: строго 4 цифры, пробел, 6 цифр.
+		// Проверяет корректность паспортных данных в строгом формате.
 		public static bool IsValidPassport(string value)
 		{
 			return PassportRegex.IsMatch((value ?? string.Empty).Trim());
 		}
 
-		// Строгий разбор паспорта для импорта: "4512 345678" или 10 цифр подряд.
-		// Старый формат "45 12 345678" и любые лишние знаки отклоняются.
+		// Пытается нормализовать паспортные данные к формату «NNNN NNNNNN».
 		public static bool TryNormalizePassport(string value, out string normalized)
 		{
 			normalized = (value ?? string.Empty).Trim();
 			if (PassportRegex.IsMatch(normalized)) return true;
 
-			// Если в строке есть пробелы, формат должен быть строго «NNNN NNNNNN»
 			if (normalized.IndexOf(' ') >= 0 || normalized.IndexOf('\u00A0') >= 0)
 			{
 				normalized = string.Empty;
@@ -85,7 +82,7 @@ namespace HotelApp.Services
 			return true;
 		}
 
-		// Приводит 10 цифр к виду "4512 345678". Если цифр не 10 — возвращает то, что есть.
+		// Форматирует последовательность цифр паспорта в стандартный вид.
 		public static string FormatPassportDigits(string value)
 		{
 			string digits = string.Empty;
@@ -97,20 +94,20 @@ namespace HotelApp.Services
 			return digits.Substring(0, 4) + " " + digits.Substring(4);
 		}
 
-		// Номер комнаты: только цифры, 1–5 знаков.
+		// Проверяет корректность номера комнаты.
 		public static bool IsValidRoomNumber(string value)
 		{
 			return RoomNumberRegex.IsMatch((value ?? string.Empty).Trim());
 		}
 
-		// Название корпуса: любая непустая строка до 50 символов.
+		// Проверяет корректность названия корпуса.
 		public static bool IsValidBuildingName(string value)
 		{
 			string text = (value ?? string.Empty).Trim();
 			return text.Length > 0 && text.Length <= MaxBuildingNameLength;
 		}
 
-		// Цена: только целые рубли, больше нуля.
+		// Проверяет корректность цены и возвращает её числовое значение.
 		public static bool IsValidPrice(string value, out int price)
 		{
 			price = 0;
@@ -119,7 +116,7 @@ namespace HotelApp.Services
 			return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out price) && price > 0;
 		}
 
-		// Дата в формате дд.мм.гггг (буквы и другие разделители не допускаются).
+		// Пытается разобрать дату в формате дд.мм.гггг.
 		public static bool TryParseDateText(string value, out DateTime date)
 		{
 			date = DateTime.MinValue;
@@ -129,20 +126,19 @@ namespace HotelApp.Services
 				DateTimeStyles.None, out date);
 		}
 
-		// Текст даты из DatePicker: цифры и точки, не больше 10 символов.
+		// Проверяет допустимость ввода символов даты в текстовое поле.
 		public static bool IsAllowedDateInput(string text, string added)
 		{
 			foreach (char c in added ?? string.Empty)
 				if (!char.IsDigit(c) && c != '.') return false;
 
-			// Не даём выйти за формат дд.мм.гггг
 			int digitCount = 0;
 			foreach (char c in (text ?? string.Empty) + (added ?? string.Empty))
 				if (char.IsDigit(c)) digitCount++;
 			return digitCount <= 8;
 		}
 
-		// Разрешённые символы для ФИО.
+		// Проверяет допустимость вводимых символов для ФИО.
 		public static bool IsAllowedNameInput(string added)
 		{
 			foreach (char c in added ?? string.Empty)

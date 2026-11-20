@@ -5,6 +5,7 @@ namespace HotelApp.Services
 {
 	public static class HotkeyService
 	{
+		// Регистрирует горячие клавиши главного окна на основе сохранённых настроек.
 		public static void Register(MainWindow window, MainViewModel vm)
 		{
 			var settings = AppSettings.Load();
@@ -12,6 +13,7 @@ namespace HotelApp.Services
 
 			var converter = new KeyGestureConverter();
 
+			// Добавляет привязку команды к сочетанию клавиш для указанного действия.
 			void AddBinding(string actionKey, ICommand command)
 			{
 				if (settings.Hotkeys.TryGetValue(actionKey, out string gestureStr))
@@ -28,10 +30,7 @@ namespace HotelApp.Services
 				}
 			}
 
-			// Сохранение — логика в ViewModel, дергаем напрямую
 			AddBinding("SaveData", new RelayCommand(_ => vm.SaveData()));
-
-			// Остальное — через публичные обёртки окна
 			AddBinding("Refresh", new RelayCommand(_ => window.TriggerRefresh()));
 			AddBinding("ImportExcel", new RelayCommand(_ => window.TriggerImportExcel()));
 			AddBinding("AddBuilding", new RelayCommand(_ => window.TriggerAddBuilding()));

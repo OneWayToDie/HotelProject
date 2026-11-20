@@ -18,8 +18,8 @@ namespace HotelApp
 {
 	public partial class MainWindow : Window
 	{
-		// Вкладка, на которой пользователь был до открытия настроек
 		private int _lastMenuIndex;
+		// Инициализирует главное окно приложения.
 
 		public MainWindow()
 		{
@@ -30,12 +30,14 @@ namespace HotelApp
 			ToastService.ToastRequested += OnToastRequested;
 			AnimationService.Changed += OnAnimationSettingsChanged;
 		}
+		// Освобождает подписки при закрытии главного окна.
 
 		private void MainWindow_Closed(object sender, EventArgs e)
 		{
 			ToastService.ToastRequested -= OnToastRequested;
 			AnimationService.Changed -= OnAnimationSettingsChanged;
 		}
+		// Выполняет инициализацию после загрузки главного окна.
 
 		private void MainWindow_Loaded(object sender, RoutedEventArgs e)
 		{
@@ -43,7 +45,6 @@ namespace HotelApp
 
 			if (DataContext is MainViewModel vm)
 			{
-				// Регистрируем горячие клавиши
 				HotkeyService.Register(this, vm);
 			}
 		}
@@ -59,6 +60,7 @@ namespace HotelApp
 
 			ApplyAnimationSettings();
 		}
+		// Применяет текущие настройки анимации интерфейса.
 
 		private void ApplyAnimationSettings()
 		{
@@ -87,6 +89,7 @@ namespace HotelApp
 
 			ShowToast(toast);
 		}
+		// Отображает всплывающее уведомление в интерфейсе.
 
 		private void ShowToast(ToastMessage toast)
 		{
@@ -152,7 +155,6 @@ namespace HotelApp
 					}
 				};
 
-				// Не копим уведомления бесконечно
 				while (ToastHost.Children.Count >= 4)
 					ToastHost.Children.RemoveAt(0);
 
@@ -187,6 +189,7 @@ namespace HotelApp
 				System.Diagnostics.Debug.WriteLine("Не удалось показать уведомление: " + ex.Message);
 			}
 		}
+		// Обновляет текущее представление главного окна.
 
 		public void RefreshView()
 		{
@@ -196,13 +199,12 @@ namespace HotelApp
 				vm.AddLog("Экран обновлен вручную.", LogType.Info);
 			}
 		}
+		// Переключает текущее представление при выборе пункта меню.
 
 		private void MenuList_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			if (DataContext is MainViewModel vm && MenuList != null)
 			{
-				// Настройки — не вкладка, а диалог: пункт меню не должен оставаться выбранным,
-				// иначе повторно открыть настройки не получится.
 				if (MenuList.SelectedIndex == 4)
 				{
 					OpenSettingsDialog();
@@ -244,7 +246,6 @@ namespace HotelApp
 					DataContext = new SettingsViewModel(this, vm)
 				};
 
-				// Ждем закрытия диалога
 				await DialogHost.Show(settingsView, "RootDialog");
 			}
 			catch (Exception ex)
@@ -254,14 +255,11 @@ namespace HotelApp
 			}
 			finally
 			{
-				// Настройки — диалог, а не вкладка: возвращаем подсветку на прежнюю вкладку,
-				// чтобы её можно было открыть повторно.
 				RestoreMenuSelection();
 				RestoreFocus();
 			}
 		}
 
-		// Возвращает клавиатурный фокус главному окну после закрытия DialogHost:
 		// без Activate() окно может остаться неактивным, и горячие клавиши не работают.
 		private void RestoreFocus()
 		{
@@ -272,7 +270,6 @@ namespace HotelApp
 				Activate();
 				Keyboard.ClearFocus();
 
-				// Фокусируем меню: оно всегда есть и принимает клавиатуру.
 				if (MenuList != null && MenuList.IsVisible)
 				{
 					MenuList.Focus();
@@ -291,7 +288,6 @@ namespace HotelApp
 			}
 		}
 
-		// Возвращает выбор в меню на вкладку, которая была открыта до настроек,
 		// не пересоздавая текущее представление.
 		private void RestoreMenuSelection()
 		{
@@ -365,7 +361,6 @@ namespace HotelApp
 			var numberBox = mainStackPanel.Children[5] as TextBox;
 			var priceBox = mainStackPanel.Children[6] as TextBox;
 
-			// Проверка на пустоту: без корпуса и номера комнаты ничего не создаем
 			if (buildingCombo?.SelectedValue == null)
 			{
 				AppDialog.Warning("Выберите корпус!", "Ошибка");
@@ -526,8 +521,6 @@ namespace HotelApp
 			var content = template.LoadContent() as FrameworkElement;
 			content.DataContext = preview;
 
-			// Показываем во внутриоконном слое, а не в DialogHost/Popup:
-			// прокрутка таблицы в слоёном Popup идёт ~6 fps, в окне — ~50 fps.
 			ImportDialogHost.Content = content;
 			ImportOverlay.Visibility = Visibility.Visible;
 			ImportDialogHost.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
@@ -538,11 +531,13 @@ namespace HotelApp
 		{
 			CloseImportOverlay();
 		}
+		// Закрывает окно импорта при щелчке по затемнённой области.
 
 		private void ImportOverlay_Click(object sender, MouseButtonEventArgs e)
 		{
 			CloseImportOverlay();
 		}
+		// Обрабатывает нажатия клавиш в окне импорта.
 
 		private void ImportOverlay_KeyDown(object sender, KeyEventArgs e)
 		{
@@ -552,6 +547,7 @@ namespace HotelApp
 				CloseImportOverlay();
 			}
 		}
+		// Закрывает слой предпросмотра импорта.
 
 		private void CloseImportOverlay()
 		{
@@ -562,7 +558,6 @@ namespace HotelApp
 		// --- О ПРОГРАММЕ ---
 		private async void OpenAbout_Click(object sender, RoutedEventArgs e)
 		{
-			// Убедимся, что DialogHost не открыт
 			if (DialogHost.IsDialogOpen("RootDialog")) return;
 
 			var template = (DataTemplate)FindResource("AboutDialogTemplate");
@@ -604,10 +599,11 @@ namespace HotelApp
 				AppDialog.Error("Не удалось применить импорт.\n" + ex.Message, "Импорт Excel");
 			}
 		}
+		// Применяет подтверждённый импорт данных из Excel.
 
 		private void ApplyImport(ImportPreviewViewModel preview, MainViewModel vm)
 		{
-			var summary = preview.Apply();
+			var summary = preview.ImportValid();
 
 			vm.RefreshBuildings();
 			if (vm.CurrentView is RoomsViewModel roomsVm)
@@ -616,7 +612,6 @@ namespace HotelApp
 			}
 			else if (vm.CurrentView is FrameworkElement view)
 			{
-				// Вкладки «Гости», «Аналитика» и «Карта» хранят VM в DataContext представления
 				if (view.DataContext is GuestsViewModel guestsVm) guestsVm.RefreshData();
 				else if (view.DataContext is AnalyticsViewModel analyticsVm) analyticsVm.Refresh();
 				else if (view.DataContext is MapViewModel mapVm) mapVm.Refresh(vm.HotelPtr);
@@ -713,10 +708,8 @@ namespace HotelApp
 
 			try
 			{
-				// 1. Всегда обновляем статистику в шапке (Всего, Свободно, Занято)
 				vm.UpdateStats();
 
-				// 2. Обновляем ту вкладку, которая сейчас открыта
 				if (vm.CurrentView is FrameworkElement view && view.DataContext != null)
 				{
 					if (view.DataContext is RoomsViewModel roomsVm)
@@ -749,12 +742,14 @@ namespace HotelApp
 		{
 			if (!InputRules.IsAllowedNameInput(e.Text)) e.Handled = true;
 		}
+		// Проверяет вставляемый текст в поле имени.
 
 		private void Name_Pasting(object sender, DataObjectPastingEventArgs e)
 		{
 			string text = GetPastedText(e);
 			if (text == null || !InputRules.IsAllowedNameInput(text)) e.CancelCommand();
 		}
+		// Ограничивает ввод в числовом поле только цифрами.
 
 		private void Digits_PreviewTextInput(object sender, TextCompositionEventArgs e)
 		{
@@ -765,6 +760,7 @@ namespace HotelApp
 				return;
 			}
 		}
+		// Проверяет вставляемый текст в числовое поле.
 
 		private void Digits_Pasting(object sender, DataObjectPastingEventArgs e)
 		{
@@ -781,6 +777,7 @@ namespace HotelApp
 			if (sender is TextBox tb && tb.MaxLength > 0 && tb.Text.Length + text.Length > tb.MaxLength)
 				e.CancelCommand();
 		}
+		// Ограничивает ввод в поле паспорта только цифрами.
 
 		private void Passport_PreviewTextInput(object sender, TextCompositionEventArgs e)
 		{
@@ -791,6 +788,7 @@ namespace HotelApp
 				return;
 			}
 		}
+		// Обрабатывает вставку текста в поле паспорта.
 
 		private void Passport_Pasting(object sender, DataObjectPastingEventArgs e)
 		{
@@ -823,6 +821,7 @@ namespace HotelApp
 			tb.Text = formatted;
 			tb.CaretIndex = formatted.Length;
 		}
+		// Ограничивает ввод символов в поле даты.
 
 		private void Date_PreviewTextInput(object sender, TextCompositionEventArgs e)
 		{
@@ -830,11 +829,13 @@ namespace HotelApp
 			if (textBox == null || !InputRules.IsAllowedDateInput(textBox.Text, e.Text))
 				e.Handled = true;
 		}
+		// Блокирует недопустимые клавиши при вводе даты.
 
 		private void Date_PreviewKeyDown(object sender, KeyEventArgs e)
 		{
 			if (e.Key == Key.Space) e.Handled = true;
 		}
+		// Проверяет вставляемый текст в поле даты.
 
 		private void Date_Pasting(object sender, DataObjectPastingEventArgs e)
 		{
@@ -848,6 +849,7 @@ namespace HotelApp
 				return;
 			}
 		}
+		// Извлекает текст из буфера обмена при вставке.
 
 		private static string GetPastedText(DataObjectPastingEventArgs e)
 		{
@@ -855,12 +857,15 @@ namespace HotelApp
 			return e.DataObject.GetData(typeof(string)) as string;
 		}
 
-		// --- ПУБЛИЧНЫЕ ОБЁРТКИ ДЛЯ ГОРЯЧИХ КЛАВИШ ---
 		// Вызывают существующие private-обработчики, не ломая инкапсуляцию.
 		public void TriggerRefresh() => RefreshCurrentView(DataContext as MainViewModel);
+		// Запускает импорт данных из Excel.
 		public void TriggerImportExcel() => ImportExcel_Click(null, null);
+		// Открывает диалог добавления корпуса.
 		public void TriggerAddBuilding() => OpenAddBuilding_Click(null, null);
+		// Открывает диалог добавления номера.
 		public void TriggerAddRoom() => OpenAddRoom_Click(null, null);
+		// Открывает диалог сведений о программе.
 		public void TriggerAbout() => OpenAbout_Click(null, null);
 	}
 }

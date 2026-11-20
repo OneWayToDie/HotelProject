@@ -1,16 +1,16 @@
-#pragma once
-#include <string>
-
-namespace HotelLogic 
-{
-    class Guest {
-    public:
-        int id;
-        std::string fullName;
-        std::string passport;
-
-        Guest(int id, const std::string& name, const std::string& passport)
-            : id(id), fullName(name), passport(passport) {
-        }
-    };
-}
+#pragma once                                                                 // Защита от повторного включения заголовочного файла
+#include <string>                                                            // Подключение класса строк стандартной библиотеки
+                                                                             // Пустая строка для разделения секций
+namespace HotelLogic                                                         // Пространство имён логики отеля
+{                                                                            // Начало блока пространства имён
+    class Guest {                                                            // Класс гостя отеля
+    public:                                                                  // Публичные члены класса
+        int id;                                                              // Уникальный идентификатор гостя
+        std::string fullName;                                                // Полное имя гостя
+        std::string passport;                                                // Паспортные данные гостя
+                                                                             // Пустая строка перед конструктором
+        Guest(int id, const std::string& name, const std::string& passport)  // Конструктор гостя
+            : id(id), fullName(name), passport(passport) {                   // Инициализация полей гостя
+        }                                                                    // Конец тела конструктора
+    };                                                                       // Конец объявления класса Guest
+}                                                                            // Конец пространства имён HotelLogic

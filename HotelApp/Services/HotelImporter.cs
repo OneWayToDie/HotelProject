@@ -9,399 +9,444 @@ namespace HotelApp.Services
 {
 	public class ImportSummary
 	{
+		// Получает или задаёт общее количество строк импорта.
 		public int TotalRows { get; set; }
+
+		// Получает или задаёт количество успешно импортированных строк.
 		public int ImportedRows { get; set; }
+
+		// Получает или задаёт количество строк с ошибками.
 		public int FailedRows { get; set; }
+
+		// Получает или задаёт количество созданных корпусов.
 		public int CreatedBuildings { get; set; }
+
+		// Получает или задаёт количество созданных номеров.
 		public int CreatedRooms { get; set; }
 	}
 
-	// Проверка и применение импортированных строк к нативной модели отеля.
 	public static class HotelImporter
 	{
 		private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
 
+		// Выполняет проверку строк импорта и заполняет сообщения об ошибках.
 		public static void Analyze(IEnumerable<ImportRow> rows, IntPtr hotelPtr)
 		{
 			var buildings = ReadBuildings(hotelPtr);
 			var rooms = ReadRooms(hotelPtr);
 			var bookings = ReadBookings(hotelPtr);
 
-			// Карта: id номера -> "корпус|номер"
 			var roomKeyById = new Dictionary<int, string>();
 			foreach (var room in rooms)
 			{
-				var building = buildings.FirstOrDefault(b => b.Id == room.BuildingId);
-				if (building.Id == 0) continue;
-				roomKeyById[room.Id] = MakeKey(building.Name, room.Number);
+				var buildingName = buildings.ContainsKey(room.BuildingId) ? buildings[room.BuildingId] : string.Empty;
+				roomKeyById[room.Id] = RoomKey(buildingName, room.Number);
 			}
 
-			// Занятые интервалы по каждому номеру: существующие брони
-			var intervals = new Dictionary<string, List<Tuple<string, string>>>(StringComparer.OrdinalIgnoreCase);
+			var bookingsByRoom = new Dictionary<string, List<(DateTime In, DateTime Out)>>();
 			foreach (var booking in bookings)
 			{
-				if (!roomKeyById.TryGetValue(booking.RoomId, out string key)) continue;
-				if (string.IsNullOrWhiteSpace(booking.CheckInDate) || string.IsNullOrWhiteSpace(booking.CheckOutDate)) continue;
-				AddInterval(intervals, key, booking.CheckInDate, booking.CheckOutDate);
+				if (!roomKeyById.TryGetValue(booking.RoomId, out var key)) continue;
+				if (!TryNormalizeDates(booking.CheckInDate, booking.CheckOutDate, out var inDate, out var outDate, out _))
+					continue;
+
+				if (!bookingsByRoom.TryGetValue(key, out var list))
+				{
+					list = new List<(DateTime In, DateTime Out)>();
+					bookingsByRoom[key] = list;
+				}
+				list.Add((inDate, outDate));
 			}
+
+			var knownPassports = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			var guestBuffer = new CGuest[1024];
+			int guestCount = Hotel_GetAllGuests(hotelPtr, guestBuffer, guestBuffer.Length);
+			for (int i = 0; i < guestCount; i++)
+			{
+				var pass = (guestBuffer[i].Passport ?? string.Empty).Trim();
+				if (pass.Length > 0) knownPassports.Add(pass);
+			}
+
+			var occupiedByPassport = new Dictionary<string, (DateTime In, DateTime Out)>(StringComparer.OrdinalIgnoreCase);
+			foreach (var room in rooms)
+			{
+				if (room.Status != 1) continue;
+				var pass = (room.GuestPassport ?? string.Empty).Trim();
+				if (pass.Length == 0) continue;
+				if (!TryNormalizeDates(room.CheckInDate, room.CheckOutDate, out var inDate, out var outDate, out _))
+					continue;
+
+				if (!occupiedByPassport.TryGetValue(pass, out var existing) || outDate > existing.Out)
+					occupiedByPassport[pass] = (inDate, outDate);
+			}
+
+			var nameByPassport = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			var buildingNameByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			var typeByRoom = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			var batchRangesByRoom = new Dictionary<string, List<(DateTime In, DateTime Out)>>(StringComparer.OrdinalIgnoreCase);
 
 			foreach (var row in rows)
-			{
-				row.Error = string.Empty;
-
-				// 1. Обязательные поля
-				var missing = new List<string>();
-				if (string.IsNullOrWhiteSpace(row.FullName)) missing.Add("ФИО");
-				if (string.IsNullOrWhiteSpace(row.Passport)) missing.Add("Паспорт");
-				if (string.IsNullOrWhiteSpace(row.Building)) missing.Add("Корпус");
-				if (string.IsNullOrWhiteSpace(row.RoomType)) missing.Add("Тип номера");
-				if (string.IsNullOrWhiteSpace(row.RoomNumber)) missing.Add("Номер");
-				if (string.IsNullOrWhiteSpace(row.PriceText)) missing.Add("Цена за сутки");
-				if (string.IsNullOrWhiteSpace(row.CheckInText)) missing.Add("Дата заезда");
-				if (string.IsNullOrWhiteSpace(row.CheckOutText)) missing.Add("Дата выезда");
-
-				if (missing.Count > 0)
-				{
-					row.Error = "Не заполнено: " + string.Join(", ", missing);
-					continue;
-				}
-
-				// 2. ФИО: только буквы, пробел и дефис
-				string fullName = InputRules.NormalizeFullName(row.FullName);
-				if (!InputRules.IsValidFullName(fullName))
-				{
-					row.Error = "ФИО: только буквы, пробел и дефис (до 100 символов).";
-					continue;
-				}
-
-				// 3. Паспорт: строго новый формат «1234 567890»
-				if (!InputRules.TryNormalizePassport(row.Passport, out string passport))
-				{
-					row.Error = "Паспорт: ожидается формат 1234 567890 (4 цифры, пробел, 6 цифр).";
-					continue;
-				}
-
-				// 4. Название корпуса: любая строка до 50 символов
-				string buildingName = (row.Building ?? string.Empty).Trim();
-				if (!InputRules.IsValidBuildingName(buildingName))
-				{
-					row.Error = "Название корпуса: от 1 до 50 символов.";
-					continue;
-				}
-
-				// 5. Номер комнаты: только цифры
-				string roomNumber = NormalizeIntegerCell(row.RoomNumber);
-				if (!InputRules.IsValidRoomNumber(roomNumber))
-				{
-					row.Error = "Номер комнаты: только цифры (до 5 знаков).";
-					continue;
-				}
-
-				// 6. Цена: только целые рубли
-				if (!TryParsePrice(row.PriceText, out double price) || price <= 0)
-				{
-					row.Error = "Цена: целое число рублей больше нуля.";
-					continue;
-				}
-				row.Price = price;
-
-				// 7. Тип номера
-				if (!TryParseRoomType(row.RoomType, out int roomType))
-				{
-					row.Error = "Тип номера: допустимо «Стандарт», «Люкс» или «Конференц-зал».";
-					continue;
-				}
-				row.RoomTypeValue = roomType;
-
-				// 8. Даты
-				if (!TryParseDate(row.CheckInText, out DateTime checkIn))
-				{
-					row.Error = "Неверная дата заезда (ожидается дд.мм.гггг).";
-					continue;
-				}
-				if (!TryParseDate(row.CheckOutText, out DateTime checkOut))
-				{
-					row.Error = "Неверная дата выезда (ожидается дд.мм.гггг).";
-					continue;
-				}
-				if (checkOut <= checkIn)
-				{
-					row.Error = "Дата выезда должна быть позже даты заезда.";
-					continue;
-				}
-				row.CheckIn = checkIn;
-				row.CheckOut = checkOut;
-
-				// 9. Пересечение с существующими бронями и с другими строками файла
-				string key = MakeKey(buildingName, roomNumber);
-				string inIso = checkIn.ToString("yyyy-MM-dd");
-				string outIso = checkOut.ToString("yyyy-MM-dd");
-
-				if (HasOverlap(intervals, key, inIso, outIso))
-				{
-					row.Error = "Даты пересекаются с другой бронью этого номера.";
-					continue;
-				}
-
-				AddInterval(intervals, key, inIso, outIso);
-
-				// Приводим значения к единому виду — их же использует Apply
-				row.FullName = fullName;
-				row.Passport = passport;
-				row.Building = buildingName;
-				row.RoomNumber = roomNumber;
-			}
+				Validate(row, rooms, buildings, bookingsByRoom,
+					knownPassports, occupiedByPassport,
+					nameByPassport, buildingNameByKey, typeByRoom, batchRangesByRoom);
 		}
 
+		// Применяет проверенные строки импорта к данным отеля.
 		public static ImportSummary Apply(IEnumerable<ImportRow> rows, IntPtr hotelPtr)
 		{
-			var summary = new ImportSummary();
+			var result = new ImportSummary();
+			var buildings = ReadBuildings(hotelPtr);
+			var rooms = ReadRooms(hotelPtr);
 
 			foreach (var row in rows)
 			{
-				summary.TotalRows++;
-
-				// Строки с ошибками не импортируем никогда
+				result.TotalRows++;
 				if (row.HasError)
 				{
-					summary.FailedRows++;
+					result.FailedRows++;
 					continue;
 				}
 
-				try
+				int buildingId = FindBuildingId(buildings, row.Building);
+				if (buildingId == 0)
 				{
-					ImportRow(row, hotelPtr, summary);
+					Hotel_AddBuilding(hotelPtr, row.Building.Trim());
+					buildings = ReadBuildings(hotelPtr);
+					buildingId = FindBuildingId(buildings, row.Building);
+					result.CreatedBuildings++;
 				}
-				catch (Exception ex)
+
+				var room = FindRoom(rooms, buildings, buildingId, row.RoomNumber);
+				if (room.Id == 0)
 				{
-					row.Error = "Ошибка импорта строки: " + ex.Message;
-					summary.FailedRows++;
+					Hotel_AddRoom(hotelPtr, buildingId, row.RoomTypeValue, row.RoomNumber.Trim(), row.Price);
+					rooms = ReadRooms(hotelPtr);
+					room = FindRoom(rooms, buildings, buildingId, row.RoomNumber);
+					result.CreatedRooms++;
 				}
+				else
+				{
+					if (Math.Abs(room.BasePrice - row.Price) > 0.001)
+						Hotel_UpdatePrice(hotelPtr, room.Id, row.Price);
+				}
+
+				if (room.Id == 0)
+				{
+					row.Error = "Не удалось создать номер в C++ модели.";
+					result.FailedRows++;
+					continue;
+				}
+
+				bool booked = Hotel_BookRoom(hotelPtr, room.Id, row.FullName.Trim(),
+					row.Passport.Trim(), row.CheckIn.ToString("yyyy-MM-dd"), row.CheckOut.ToString("yyyy-MM-dd"));
+
+				if (!booked)
+				{
+					row.Error = "C++ модель отклонила бронь (пересечение дат или некорректные данные).";
+					result.FailedRows++;
+					continue;
+				}
+
+				result.ImportedRows++;
 			}
 
-			return summary;
+			return result;
 		}
 
-		private static void ImportRow(ImportRow row, IntPtr hotelPtr, ImportSummary summary)
+		// Проверяет одну строку импорта и заполняет её нормализованными данными или ошибкой.
+		private static void Validate(ImportRow row,
+			List<CRoom> rooms, Dictionary<int, string> buildings,
+			Dictionary<string, List<(DateTime In, DateTime Out)>> bookingsByRoom,
+			HashSet<string> knownPassports,
+			Dictionary<string, (DateTime In, DateTime Out)> occupiedByPassport,
+			Dictionary<string, string> nameByPassport,
+			Dictionary<string, string> buildingNameByKey,
+			Dictionary<string, int> typeByRoom,
+			Dictionary<string, List<(DateTime In, DateTime Out)>> batchRangesByRoom)
 		{
-			var buildings = ReadBuildings(hotelPtr);
-			var building = buildings.FirstOrDefault(b =>
-				string.Equals((b.Name ?? string.Empty).Trim(), (row.Building ?? string.Empty).Trim(),
-					StringComparison.OrdinalIgnoreCase));
+			row.Error = string.Empty;
 
-			if (building.Id == 0)
+			row.FullName = InputRules.NormalizeFullName(row.FullName);
+			row.Passport = (row.Passport ?? string.Empty).Trim();
+			row.Building = (row.Building ?? string.Empty).Trim();
+			row.RoomType = (row.RoomType ?? string.Empty).Trim();
+			row.RoomNumber = (row.RoomNumber ?? string.Empty).Trim();
+
+			if (string.IsNullOrWhiteSpace(row.FullName))
 			{
-				NativeMethods.Hotel_AddBuilding(hotelPtr, row.Building.Trim());
-				summary.CreatedBuildings++;
-
-				buildings = ReadBuildings(hotelPtr);
-				building = buildings.FirstOrDefault(b =>
-					string.Equals((b.Name ?? string.Empty).Trim(), (row.Building ?? string.Empty).Trim(),
-						StringComparison.OrdinalIgnoreCase));
+				row.Error = "Не указано ФИО гостя.";
+				return;
 			}
-
-			if (building.Id == 0)
+			if (!InputRules.IsValidFullName(row.FullName))
 			{
-				row.Error = "Не удалось создать корпус.";
-				summary.FailedRows++;
+				row.Error = "ФИО должно содержать только буквы, пробел и дефис (2–100 символов).";
 				return;
 			}
 
-			var rooms = ReadRooms(hotelPtr);
-			var room = rooms.FirstOrDefault(r =>
-				r.BuildingId == building.Id &&
-				string.Equals((r.Number ?? string.Empty).Trim(), (row.RoomNumber ?? string.Empty).Trim(),
-					StringComparison.OrdinalIgnoreCase));
-
-			if (room.Id == 0)
+			if (!InputRules.TryNormalizePassport(row.Passport, out var passport))
 			{
-				NativeMethods.Hotel_AddRoom(hotelPtr, building.Id, row.RoomTypeValue, row.RoomNumber.Trim(), row.Price);
-				summary.CreatedRooms++;
-
-				rooms = ReadRooms(hotelPtr);
-				room = rooms.FirstOrDefault(r =>
-					r.BuildingId == building.Id &&
-					string.Equals((r.Number ?? string.Empty).Trim(), (row.RoomNumber ?? string.Empty).Trim(),
-						StringComparison.OrdinalIgnoreCase));
+				row.Error = "Паспорт должен быть в формате «1234 567890».";
+				return;
 			}
+			row.Passport = passport;
 
-			if (room.Id == 0)
+			if (string.IsNullOrWhiteSpace(row.Building))
 			{
-				row.Error = "Не удалось создать номер.";
-				summary.FailedRows++;
+				row.Error = "Не указан корпус.";
+				return;
+			}
+			if (!InputRules.IsValidBuildingName(row.Building))
+			{
+				row.Error = "Название корпуса слишком длинное (максимум 50 символов).";
 				return;
 			}
 
-			bool booked = NativeMethods.Hotel_BookRoom(
-				hotelPtr,
-				room.Id,
-				row.FullName.Trim(),
-				row.Passport.Trim(),
-				row.CheckIn.ToString("yyyy-MM-dd"),
-				row.CheckOut.ToString("yyyy-MM-dd"));
+			int type = ParseType(row.RoomType);
+			if (type < 0)
+			{
+				row.Error = "Тип номера должен быть: Стандарт, Люкс или Конференц-зал.";
+				return;
+			}
+			row.RoomTypeValue = type;
 
-			if (booked)
+			if (!InputRules.IsValidRoomNumber(row.RoomNumber))
 			{
-				summary.ImportedRows++;
+				row.Error = "Номер комнаты должен содержать только цифры (1–5 знаков).";
+				return;
 			}
-			else
+
+			if (!TryParsePrice(row.PriceText, out var price))
 			{
-				row.Error = "Бронирование не создано: даты пересекаются с существующей бронью.";
-				summary.FailedRows++;
+				row.Error = "Цена за сутки должна быть целым положительным числом.";
+				return;
 			}
+			row.Price = price;
+
+			if (!TryNormalizeDates(row.CheckInText, row.CheckOutText, out var inDate, out var outDate, out var dateError))
+			{
+				row.Error = dateError;
+				return;
+			}
+			row.CheckIn = inDate;
+			row.CheckOut = outDate;
+
+			string passKey = row.Passport;
+			if (!nameByPassport.TryGetValue(passKey, out var existingName))
+			{
+				nameByPassport[passKey] = row.FullName;
+			}
+			else if (!string.Equals(existingName, row.FullName, StringComparison.OrdinalIgnoreCase))
+			{
+				row.Error = "Для одного паспорта указаны разные ФИО в разных строках.";
+				return;
+			}
+
+			string buildingKey = row.Building.Trim().ToLowerInvariant();
+			if (!buildingNameByKey.TryGetValue(buildingKey, out var canonicalBuilding))
+			{
+				buildingNameByKey[buildingKey] = row.Building;
+			}
+			else if (!string.Equals(canonicalBuilding, row.Building, StringComparison.Ordinal))
+			{
+				row.Error = "Название одного и того же корпуса написано по-разному в разных строках.";
+				return;
+			}
+
+			string key = RoomKey(row.Building, row.RoomNumber);
+			if (!typeByRoom.TryGetValue(key, out var existingType))
+			{
+				typeByRoom[key] = type;
+			}
+			else if (existingType != type)
+			{
+				row.Error = "Для одного и того же номера указан разный тип в разных строках.";
+				return;
+			}
+
+			var existingRoom = rooms.FirstOrDefault(r =>
+				buildings.ContainsKey(r.BuildingId) &&
+				string.Equals(buildings[r.BuildingId], row.Building, StringComparison.OrdinalIgnoreCase) &&
+				string.Equals((r.Number ?? string.Empty).Trim(), row.RoomNumber, StringComparison.OrdinalIgnoreCase));
+
+			if (existingRoom.Id != 0 && existingRoom.Type != type)
+			{
+				row.Error = "Номер уже существует в отеле с другим типом.";
+				return;
+			}
+
+			if (occupiedByPassport.TryGetValue(passKey, out var occupied) && inDate < occupied.Out)
+			{
+				row.Error = "Этот гость уже проживает в указанный период (пересечение с текущим заселением).";
+				return;
+			}
+
+			if (bookingsByRoom.TryGetValue(key, out var existingRanges))
+			{
+				foreach (var range in existingRanges)
+				{
+					if (DatesOverlap(inDate, outDate, range.In, range.Out))
+					{
+						row.Error = "Даты пересекаются с существующей бронью или проживанием в этом номере.";
+						return;
+					}
+				}
+			}
+
+			if (!batchRangesByRoom.TryGetValue(key, out var batchRanges))
+			{
+				batchRanges = new List<(DateTime In, DateTime Out)>();
+				batchRangesByRoom[key] = batchRanges;
+			}
+
+			foreach (var range in batchRanges)
+			{
+				if (DatesOverlap(inDate, outDate, range.In, range.Out))
+				{
+					row.Error = "Даты пересекаются с другой строкой импорта для этого номера.";
+					return;
+				}
+			}
+
+			batchRanges.Add((inDate, outDate));
 		}
 
-		#region Проверки
-
-		public static bool TryParseDate(string value, out DateTime result)
+		// Считывает список корпусов из нативной модели отеля.
+		private static Dictionary<int, string> ReadBuildings(IntPtr hotelPtr)
 		{
-			result = DateTime.MinValue;
-			if (string.IsNullOrWhiteSpace(value)) return false;
-
-			string text = value.Trim();
-			string[] formats =
-			{
-				"dd.MM.yyyy", "d.M.yyyy", "dd.MM.yy", "d.M.yy",
-				"dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "d-M-yyyy"
-			};
-
-			if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture,
-				DateTimeStyles.None, out result))
-				return true;
-
-			return DateTime.TryParse(text, RuCulture, DateTimeStyles.None, out result);
+			var result = new Dictionary<int, string>();
+			var buffer = new CBuilding[256];
+			int count = Hotel_GetAllBuildings(hotelPtr, buffer, buffer.Length);
+			for (int i = 0; i < count; i++)
+				result[buffer[i].Id] = buffer[i].Name ?? string.Empty;
+			return result;
 		}
 
-		public static bool TryParsePrice(string value, out double result)
+		// Считывает список номеров из нативной модели отеля.
+		private static List<CRoom> ReadRooms(IntPtr hotelPtr)
 		{
-			result = 0;
-			if (string.IsNullOrWhiteSpace(value)) return false;
+			var buffer = new CRoom[1024];
+			int count = Hotel_GetAllRooms(hotelPtr, buffer, buffer.Length);
+			return buffer.Take(count).ToList();
+		}
 
-			string text = value.Trim().ToLowerInvariant()
-				.Replace('\u00A0', ' ')
-				.Replace("₽", string.Empty)
-				.Replace("руб.", string.Empty)
-				.Replace("руб", string.Empty)
-				.Replace("р.", string.Empty)
-				.Replace(" ", string.Empty);
+		// Считывает список бронирований из нативной модели отеля.
+		private static List<CBooking> ReadBookings(IntPtr hotelPtr)
+		{
+			var buffer = new CBooking[2048];
+			int count = Hotel_GetAllBookings(hotelPtr, buffer, buffer.Length);
+			return buffer.Take(count).ToList();
+		}
 
-			// Цена — только целые рубли
-			text = NormalizeIntegerCell(text);
-			if (!InputRules.IsValidPrice(text, out int price)) return false;
+		// Пытается разобрать и нормализовать даты заезда и выезда.
+		private static bool TryNormalizeDates(string inText, string outText, out DateTime inDate, out DateTime outDate, out string error)
+		{
+			inDate = default(DateTime);
+			outDate = default(DateTime);
+			error = string.Empty;
 
-			result = price;
+			if (!InputRules.TryParseDateText(inText, out inDate))
+			{
+				error = "Дата заезда должна быть в формате дд.мм.гггг.";
+				return false;
+			}
+
+			if (!InputRules.TryParseDateText(outText, out outDate))
+			{
+				error = "Дата выезда должна быть в формате дд.мм.гггг.";
+				return false;
+			}
+
+			if (outDate <= inDate)
+			{
+				error = "Дата выезда должна быть позже даты заезда.";
+				return false;
+			}
+
 			return true;
 		}
 
-		// Excel иногда отдаёт числовые ячейки как "101.0" — приводим к целому виду.
-		private static string NormalizeIntegerCell(string value)
+		// Пытается разобрать цену за сутки из текстового значения.
+		private static bool TryParsePrice(string text, out double price)
 		{
-			string text = (value ?? string.Empty).Trim();
-			if (text.Length == 0 || !text.Contains(".")) return text;
-
-			if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal number) &&
-				number == decimal.Truncate(number))
-				return ((long)number).ToString(CultureInfo.InvariantCulture);
-
-			return text;
+			price = 0;
+			if (!InputRules.IsValidPrice(text, out var intPrice))
+				return false;
+			price = intPrice;
+			return true;
 		}
 
-		public static bool TryParseRoomType(string value, out int roomType)
+		// Формирует нормализованный ключ номера по корпусу и номеру комнаты.
+		private static string RoomKey(string building, string number)
 		{
-			roomType = 0;
-			if (string.IsNullOrWhiteSpace(value)) return false;
+			return (building ?? string.Empty).Trim().ToLowerInvariant() + "|" +
+				(number ?? string.Empty).Trim().ToLowerInvariant();
+		}
 
-			string text = value.Trim().ToLowerInvariant().Replace('ё', 'е');
+		// Преобразует текстовое название типа номера в числовой код.
+		private static int ParseType(string value)
+		{
+			string v = (value ?? string.Empty).Trim().ToLowerInvariant().Replace('ё', 'е');
+			if (v == "стандарт" || v == "standard") return 0;
+			if (v == "люкс" || v == "lux") return 1;
+			if (v == "конференц-зал" || v == "конференц зал" || v == "conference") return 2;
+			return -1;
+		}
 
-			if (text == "стандарт" || text == "standard")
+		// Возвращает вместимость номера по типу для справочных операций.
+		private static int GetTypeCapacity(int type)
+		{
+			switch (type)
 			{
-				roomType = 0;
-				return true;
+				case 1: return 2;
+				case 2: return 20;
+				default: return 2;
 			}
-			if (text == "люкс" || text == "lux")
+		}
+
+		// Возвращает текстовое название типа номера по числовому коду.
+		private static string FormatType(int type)
+		{
+			switch (type)
 			{
-				roomType = 1;
-				return true;
+				case 1: return "Люкс";
+				case 2: return "Конференц-зал";
+				default: return "Стандарт";
 			}
-			if (text == "конференц-зал" || text == "конференц зал" ||
-				text == "конференц" || text == "conference")
+		}
+
+		// Ищет идентификатор корпуса по названию без учёта регистра.
+		private static int FindBuildingId(Dictionary<int, string> buildings, string name)
+		{
+			foreach (var pair in buildings)
 			{
-				roomType = 2;
-				return true;
+				if (string.Equals(pair.Value, name, StringComparison.OrdinalIgnoreCase))
+					return pair.Key;
 			}
-
-			return false;
+			return 0;
 		}
 
-		#endregion
-
-		#region Вспомогательное
-
-		private static string MakeKey(string building, string roomNumber)
+		// Ищет номер в списке по корпусу и отображаемому номеру комнаты.
+		private static CRoom FindRoom(List<CRoom> rooms, Dictionary<int, string> buildings, int buildingId, string number)
 		{
-			return (building ?? string.Empty).Trim().ToLowerInvariant().Replace('ё', 'е') + "|" +
-				   (roomNumber ?? string.Empty).Trim().ToLowerInvariant();
-		}
-
-		private static void AddInterval(
-			Dictionary<string, List<Tuple<string, string>>> intervals,
-			string key, string inIso, string outIso)
-		{
-			if (!intervals.TryGetValue(key, out var list))
+			foreach (var room in rooms)
 			{
-				list = new List<Tuple<string, string>>();
-				intervals[key] = list;
+				if (room.BuildingId != buildingId) continue;
+				if (string.Equals((room.Number ?? string.Empty).Trim(), number.Trim(), StringComparison.OrdinalIgnoreCase))
+					return room;
 			}
-			list.Add(Tuple.Create(inIso, outIso));
+			return default(CRoom);
 		}
 
-		private static bool HasOverlap(
-			Dictionary<string, List<Tuple<string, string>>> intervals,
-			string key, string inIso, string outIso)
+		// Проверяет пересечение двух диапазонов дат проживания.
+		private static bool DatesOverlap(DateTime aIn, DateTime aOut, DateTime bIn, DateTime bOut)
 		{
-			if (!intervals.TryGetValue(key, out var list)) return false;
-
-			foreach (var interval in list)
-			{
-				// Пересечение [in, out) и [existingIn, existingOut)
-				if (string.CompareOrdinal(inIso, interval.Item2) < 0 &&
-					string.CompareOrdinal(interval.Item1, outIso) < 0)
-					return true;
-			}
-
-			return false;
+			return aIn < bOut && bIn < aOut;
 		}
 
-		private static List<CBuilding> ReadBuildings(IntPtr hotelPtr)
+		// Вычисляет количество дней между датами заезда и выезда.
+		private static int CountDays(DateTime inDate, DateTime outDate)
 		{
-			var buffer = new CBuilding[1000];
-			int count = NativeMethods.Hotel_GetAllBuildings(hotelPtr, buffer, 1000);
-
-			var list = new List<CBuilding>(count);
-			for (int i = 0; i < count; i++) list.Add(buffer[i]);
-			return list;
+			return Math.Max(1, (int)Math.Ceiling((outDate.Date - inDate.Date).TotalDays));
 		}
-
-		private static List<CRoom> ReadRooms(IntPtr hotelPtr)
-		{
-			var buffer = new CRoom[2000];
-			int count = NativeMethods.Hotel_GetAllRooms(hotelPtr, buffer, 2000);
-
-			var list = new List<CRoom>(count);
-			for (int i = 0; i < count; i++) list.Add(buffer[i]);
-			return list;
-		}
-
-		private static List<CBooking> ReadBookings(IntPtr hotelPtr)
-		{
-			var buffer = new CBooking[2000];
-			int count = NativeMethods.Hotel_GetAllBookings(hotelPtr, buffer, 2000);
-
-			var list = new List<CBooking>(count);
-			for (int i = 0; i < count; i++) list.Add(buffer[i]);
-			return list;
-		}
-
-		#endregion
 	}
 }

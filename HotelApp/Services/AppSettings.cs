@@ -7,7 +7,7 @@ namespace HotelApp.Services
 {
 	public class AppSettings
 	{
-		// Словарь горячих клавиш. Ключ — действие, Значение — комбинация (формат WPF)
+		// Получает или задаёт сопоставление действий и сочетаний горячих клавиш.
 		public Dictionary<string, string> Hotkeys { get; set; } = new Dictionary<string, string>
 		{
 			{ "Refresh", "F5" },
@@ -18,16 +18,16 @@ namespace HotelApp.Services
 			{ "About", "F1" }
 		};
 
-		// Тема оформления: Indigo, Emerald, Ruby или Amber
+		// Получает или задаёт имя выбранной темы оформления.
 		public string Theme { get; set; } = ThemeService.DefaultTheme;
 
-		// Плавные анимации интерфейса (появление вкладок и карточек)
+		// Получает или задаёт признак включения анимаций интерфейса.
 		public bool EnableAnimations { get; set; } = true;
 
-		// Путь к файлу настроек (Вариант А: в папке с exe)
+		// Возвращает путь к файлу настроек приложения.
 		private static string FilePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
-		// Загрузка настроек (если файла нет — создаёт дефолтный)
+		// Загружает настройки приложения из файла или создаёт настройки по умолчанию.
 		public static AppSettings Load()
 		{
 			if (File.Exists(FilePath))
@@ -39,17 +39,16 @@ namespace HotelApp.Services
 				}
 				catch
 				{
-					return new AppSettings(); // Если файл битый, возвращаем дефолт
+					return new AppSettings();
 				}
 			}
 
-			// Файла нет — создаём дефолтный
 			var defaults = new AppSettings();
 			Save(defaults);
 			return defaults;
 		}
 
-		// Сохранение настроек в JSON
+		// Сохраняет настройки приложения в файл.
 		public static void Save(AppSettings settings)
 		{
 			try

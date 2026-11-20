@@ -2,20 +2,22 @@
 
 namespace HotelApp.Services
 {
-	// Глобальный флаг анимаций: читается представлениями при появлении
-	// и меняется из настроек без перезапуска приложения.
 	public static class AnimationService
 	{
+		// Получает признак включения анимаций интерфейса.
 		public static bool Enabled { get; private set; } = true;
 
+		// Событие изменения состояния анимаций.
 		public static event Action Changed;
 
+		// Инициализирует сервис анимаций начальным значением.
 		public static void Initialize(bool enabled)
 		{
 			Enabled = enabled;
 			Changed?.Invoke();
 		}
 
+		// Устанавливает текущее состояние анимаций интерфейса.
 		public static void SetEnabled(bool enabled)
 		{
 			if (Enabled == enabled) return;
@@ -24,3 +26,4 @@ namespace HotelApp.Services
 		}
 	}
 }
+

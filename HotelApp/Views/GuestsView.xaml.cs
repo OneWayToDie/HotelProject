@@ -13,30 +13,28 @@ namespace HotelApp.Views
 	{
 		private GuestModel _lastSelectedGuest;
 
+		// Инициализирует представление списка гостей.
 		public GuestsView()
 		{
 			InitializeComponent();
-
-			// Подписываемся на клик по строкам DataGrid
 			GuestsGrid.AddHandler(DataGridRow.PreviewMouseLeftButtonDownEvent,
 				new MouseButtonEventHandler(DataGridRow_PreviewMouseLeftButtonDown), true);
 		}
 
+		// Снимает выделение строки гостя при повторном щелчке по ней.
 		private void DataGridRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			// Получаем строку, по которой кликнули
 			var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
 			if (row == null) return;
 
 			var guest = row.DataContext as GuestModel;
 			if (guest == null) return;
 
-			// Если кликнули по уже выбранной строке — снимаем выделение
-			if (_lastSelectedGuest == guest && GuestsGrid.SelectedItem == guest)
+			if (GuestsGrid.SelectedItem == guest && _lastSelectedGuest == guest)
 			{
+				e.Handled = true;
 				GuestsGrid.SelectedItem = null;
 				_lastSelectedGuest = null;
-				e.Handled = true; // Предотвращаем дальнейшую обработку
 			}
 			else
 			{
@@ -44,41 +42,38 @@ namespace HotelApp.Views
 			}
 		}
 
-		// Вспомогательный метод для поиска родительского элемента
-		private T FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+		// Находит родительский элемент указанного типа в визуальном дереве.
+		private static T FindVisualParent<T>(DependencyObject child) where T : DependencyObject
 		{
-			DependencyObject parentObject = VisualTreeHelper.GetParent(child);
-			if (parentObject == null) return null;
-
-			T parent = parentObject as T;
-			if (parent != null)
-				return parent;
-
-			return FindVisualParent<T>(parentObject);
+			while (child != null)
+			{
+				if (child is T parent) return parent;
+				child = VisualTreeHelper.GetParent(child);
+			}
+			return null;
 		}
 
-		// --- УДАЛЕНИЕ ГОСТЯ ИЗ БАЗЫ ---
+		// Обрабатывает удаление выбранного гостя.
 		private void DeleteGuest_Click(object sender, RoutedEventArgs e)
 		{
-			if (!(DataContext is GuestsViewModel vm)) return;
 			try
 			{
-				if (!(GuestsGrid.SelectedItem is GuestModel guest))
+				if (!(DataContext is GuestsViewModel vm)) return;
+				var guest = GuestsGrid.SelectedItem as GuestModel ?? (sender as FrameworkElement)?.Tag as GuestModel;
+				if (guest == null)
 				{
-					AppDialog.Warning("Выберите гостя в таблице.", "Удаление гостя");
+					AppDialog.Warning("Выберите гостя для удаления.", "База гостей");
 					return;
 				}
-				bool confirmed = AppDialog.Confirm(
-					$"Удалить гостя «{guest.FullName}» из базы?\nЗаписи о бронированиях сохранятся.",
-					"Удаление гостя", "Удалить", "Отмена");
-				if (!confirmed) return;
+
+				if (!AppDialog.Confirm($"Удалить гостя {guest.FullName}?", "Удаление гостя", "Удалить", "Отмена"))
+					return;
+
 				vm.DeleteGuest(guest);
 			}
 			catch (Exception ex)
 			{
-				if (Application.Current.MainWindow?.DataContext is MainViewModel mainVm)
-					mainVm.AddLog("Удаление гостя: " + ex.Message, LogType.Error);
-				AppDialog.Error("Не удалось удалить гостя.\n" + ex.Message, "База гостей");
+				AppDialog.Error("Не удалось удалить гостя: " + ex.Message, "Ошибка");
 			}
 		}
 	}

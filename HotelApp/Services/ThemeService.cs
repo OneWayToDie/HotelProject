@@ -5,13 +5,13 @@ using MaterialDesignThemes.Wpf;
 
 namespace HotelApp.Services
 {
-	// Применение цветовых тем MaterialDesign через PaletteHelper (API v4.9.0).
 	public static class ThemeService
 	{
 		public const string DefaultTheme = "Indigo";
 
 		public static readonly string[] AvailableThemes = { "Indigo", "Emerald", "Ruby", "Amber" };
 
+		// Применяет выбранную цветовую тему оформления приложения.
 		public static void Apply(string themeName)
 		{
 			try
@@ -27,11 +27,11 @@ namespace HotelApp.Services
 			}
 			catch (Exception ex)
 			{
-				// Тема не должна ронять приложение — просто остаёмся на текущей.
 				System.Diagnostics.Debug.WriteLine("Не удалось применить тему: " + ex.Message);
 			}
 		}
 
+		// Нормализует имя темы и возвращает поддерживаемое значение.
 		public static string Normalize(string themeName)
 		{
 			if (string.IsNullOrWhiteSpace(themeName)) return DefaultTheme;
@@ -40,9 +40,13 @@ namespace HotelApp.Services
 			return match ?? DefaultTheme;
 		}
 
-		// Цвет для кружка-образца в настройках.
-		public static Color GetSwatch(string themeName) => GetColors(Normalize(themeName)).Primary;
+		// Возвращает основной цвет темы для отображения образца.
+		public static Color GetSwatch(string themeName)
+		{
+			return GetColors(Normalize(themeName)).Primary;
+		}
 
+		// Возвращает пару основных цветов для указанной темы.
 		private static (Color Primary, Color Secondary) GetColors(string name)
 		{
 			switch (name)
@@ -53,7 +57,7 @@ namespace HotelApp.Services
 					return (Color.FromRgb(0xC6, 0x28, 0x28), Color.FromRgb(0xFF, 0x8F, 0x00));
 				case "Amber":
 					return (Color.FromRgb(0xFF, 0x8F, 0x00), Color.FromRgb(0x45, 0x5A, 0x64));
-				default: // Indigo
+				default:
 					return (Color.FromRgb(0x3F, 0x51, 0xB5), Color.FromRgb(0xFF, 0xC1, 0x07));
 			}
 		}

@@ -13,12 +13,13 @@ namespace HotelApp.Views
 {
 	public partial class RoomsView : UserControl
 	{
+		// Инициализирует представление управления номерами.
 		public RoomsView()
 		{
 			InitializeComponent();
 		}
 
-		// --- ФИЛЬТРЫ ---
+		// Применяет выбранный фильтр списка номеров.
 		private void Filter_Checked(object sender, RoutedEventArgs e)
 		{
 			if (DataContext is RoomsViewModel vm && sender is RadioButton rb)
@@ -31,7 +32,7 @@ namespace HotelApp.Views
 			}
 		}
 
-		// --- ЗАСЕЛЕНИЕ (без изменений, только добавили лог) ---
+		// Обрабатывает нажатие кнопки заселения гостя.
 		private async void CheckIn_Click(object sender, RoutedEventArgs e)
 		{
 			try
@@ -44,6 +45,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Обрабатывает двойной щелчок по номеру для быстрого заселения.
 		private async void RoomsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
 		{
 			try
@@ -54,7 +56,6 @@ namespace HotelApp.Views
 				var room = row.Item as RoomModel;
 				if (room == null) return;
 
-				// Заселение по двойному клику — только для номеров, которые уже можно заселить сейчас.
 				if (room.Status != 0 || !room.IsWaitingForCheckIn) return;
 
 				RoomsGrid.SelectedItem = room;
@@ -66,6 +67,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Выполняет сценарий заселения гостя в выбранный номер.
 		private async Task CheckInAsync()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
@@ -80,7 +82,6 @@ namespace HotelApp.Views
 			var card = dialogContent as MaterialDesignThemes.Wpf.Card;
 			var panel = card?.Content as StackPanel;
 
-			// --- НОВОЕ: Ищем активную бронь на сегодня и подставляем данные ---
 			if (DataContext is RoomsViewModel vm && panel != null)
 			{
 				string todayStr = DateTime.Today.ToString("yyyy-MM-dd");
@@ -98,13 +99,11 @@ namespace HotelApp.Views
 					if (nameBox != null) nameBox.Text = activeBooking.GuestName;
 					if (passportBox != null) passportBox.Text = InputRules.FormatPassportDigits(activeBooking.Passport);
 
-					// Дата заезда - сегодня, дата выезда - из брони
 					if (inPicker != null) inPicker.SelectedDate = DateTime.Today;
 					if (outPicker != null && DateTime.TryParse(activeBooking.CheckOutDate, out var outDate))
 						outPicker.SelectedDate = outDate;
 				}
 			}
-			// -----------------------------------------------------------------
 
 			var result = await DialogHost.Show(dialogContent, "RootDialog");
 
@@ -138,7 +137,7 @@ namespace HotelApp.Views
 			}
 		}
 
-		// --- БРОНИРОВАНИЕ ---
+		// Обрабатывает нажатие кнопки бронирования номера.
 		private async void Book_Click(object sender, RoutedEventArgs e)
 		{
 			try
@@ -151,6 +150,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Выполняет сценарий бронирования выбранного номера.
 		private async Task BookAsync()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
@@ -179,6 +179,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Обрабатывает нажатие кнопки изменения цены номера.
 		private async void EditPrice_Click(object sender, RoutedEventArgs e)
 		{
 			try
@@ -191,6 +192,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Выполняет сценарий изменения базовой цены выбранного номера.
 		private async Task EditPriceAsync()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
@@ -210,7 +212,6 @@ namespace HotelApp.Views
 				{
 					if (DataContext is RoomsViewModel vm)
 					{
-						// Обновление цены и логирование выполняет ViewModel
 						vm.UpdatePrice(selectedRoom.Id, newPrice);
 					}
 				}
@@ -224,7 +225,7 @@ namespace HotelApp.Views
 			}
 		}
 
-		// --- ВЫСЕЛЕНИЕ (добавили лог) ---
+		// Обрабатывает нажатие кнопки выселения гостя.
 		private void CheckOut_Click(object sender, RoutedEventArgs e)
 		{
 			try
@@ -237,6 +238,7 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Выполняет выселение гостя из выбранного номера.
 		private void CheckOutCore()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
@@ -245,12 +247,11 @@ namespace HotelApp.Views
 
 			if (DataContext is RoomsViewModel vm)
 			{
-				// Логирование и обновление данных выполняет ViewModel
 				vm.CheckOut(selectedRoom.Id);
 			}
 		}
 
-		// --- ЗАВЕРШЕНИЕ УБОРКИ ---
+		// Обрабатывает нажатие кнопки завершения уборки номера.
 		private void FinishCleaning_Click(object sender, RoutedEventArgs e)
 		{
 			try
@@ -263,12 +264,13 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Выполняет завершение уборки выбранного номера.
 		private void FinishCleaningCore()
 		{
 			var selectedRoom = RoomsGrid.SelectedItem as RoomModel;
 			if (selectedRoom == null) { AppDialog.Warning("Выберите номер!", "Уборка"); return; }
 
-			if (selectedRoom.Status != 2) // 2 = На уборке
+			if (selectedRoom.Status != 2)
 			{
 				AppDialog.Warning("Этот номер не находится на уборке!", "Ошибка");
 				return;
@@ -276,12 +278,11 @@ namespace HotelApp.Views
 
 			if (DataContext is RoomsViewModel vm)
 			{
-				// Логирование и обновление данных выполняет ViewModel
 				vm.FinishCleaning(selectedRoom.Id);
 			}
 		}
 
-		// Единая обработка ошибок экрана «Номера и Фонд»
+		// Показывает ошибку операции и записывает её в журнал приложения.
 		private void ReportError(string action, Exception ex)
 		{
 			if (Application.Current.MainWindow?.DataContext is MainViewModel mainVm)

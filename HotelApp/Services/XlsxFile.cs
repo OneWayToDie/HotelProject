@@ -21,10 +21,7 @@ namespace HotelApp.Services
 		private static readonly XNamespace Rel = RelNs;
 		private static readonly XNamespace PkgRel = PkgRelNs;
 
-		#region Чтение
-
-		// Возвращает все строки первого листа. Пустые ячейки — пустые строки.
-		// Даты (ячейки с форматом даты) преобразуются в строки "dd.MM.yyyy".
+		// Читает первый лист файла Excel и возвращает его строки, преобразуя даты в формат dd.MM.yyyy.
 		public static List<string[]> ReadFirstSheet(string path)
 		{
 			using (var zip = ZipFile.OpenRead(path))
@@ -74,6 +71,7 @@ namespace HotelApp.Services
 			}
 		}
 
+		// Читает значение ячейки с учётом общих строк и форматов дат.
 		private static string ReadCell(XElement cell, List<string> shared, HashSet<int> dateStyles)
 		{
 			string type = (string)cell.Attribute("t");
@@ -100,7 +98,6 @@ namespace HotelApp.Services
 			if (type == "str" || type == "b" || type == "e")
 				return cell.Element(Main + "v")?.Value ?? string.Empty;
 
-			// Обычное число (может быть датой)
 			string raw = cell.Element(Main + "v")?.Value ?? string.Empty;
 			if (raw.Length == 0) return string.Empty;
 
@@ -114,6 +111,7 @@ namespace HotelApp.Services
 			return raw;
 		}
 
+		// Читает таблицу общих строк из файла Excel.
 		private static List<string> ReadSharedStrings(ZipArchive zip)
 		{
 			var result = new List<string>();
@@ -130,6 +128,7 @@ namespace HotelApp.Services
 			return result;
 		}
 
+		// Определяет стили ячеек, соответствующие форматам дат.
 		private static HashSet<int> ReadDateStyles(ZipArchive zip)
 		{
 			var result = new HashSet<int>();
@@ -171,9 +170,9 @@ namespace HotelApp.Services
 			return result;
 		}
 
+		// Проверяет, относится ли числовой формат ячейки к дате или времени.
 		private static bool IsDateFormat(int numFmtId, Dictionary<int, string> customFormats)
 		{
-			// Встроенные форматы даты/времени Excel
 			if ((numFmtId >= 14 && numFmtId <= 22) ||
 				(numFmtId >= 27 && numFmtId <= 36) ||
 				(numFmtId >= 45 && numFmtId <= 47) ||
@@ -189,6 +188,7 @@ namespace HotelApp.Services
 			return false;
 		}
 
+		// Определяет путь к первому листу книги Excel.
 		private static string FindFirstSheetPath(ZipArchive zip)
 		{
 			var workbookEntry = zip.GetEntry("xl/workbook.xml");
@@ -224,6 +224,7 @@ namespace HotelApp.Services
 			return "xl/worksheets/sheet1.xml";
 		}
 
+		// Преобразует буквенное обозначение столбца в числовой индекс.
 		private static int ColumnIndex(string cellRef)
 		{
 			int index = 0;
@@ -236,12 +237,7 @@ namespace HotelApp.Services
 			return Math.Max(0, index - 1);
 		}
 
-		#endregion
-
-		#region Запись
-
-		// Пишет один лист с шапкой. Поддерживаются string, int, double, DateTime.
-		// columnWidths — ширины колонок (null — стандартные для шаблона гостей).
+		// Создаёт файл Excel с указанными заголовками, данными и параметрами оформления листа.
 		public static void Write(string path, string sheetName, string[] headers, IList<object[]> rows,
 			int[] columnWidths = null, bool includeRoomTypeValidation = true, bool includeAutoFilter = true)
 		{
@@ -259,6 +255,7 @@ namespace HotelApp.Services
 			}
 		}
 
+		// Записывает XML-содержимое в запись архива Excel.
 		private static void WriteEntry(ZipArchive zip, string name, Action<XmlWriter> write)
 		{
 			var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
@@ -274,6 +271,7 @@ namespace HotelApp.Services
 			}
 		}
 
+		// Формирует файл описания типов содержимого пакета Excel.
 		private static void WriteContentTypes(XmlWriter w)
 		{
 			w.WriteStartDocument(true);
@@ -290,6 +288,7 @@ namespace HotelApp.Services
 			w.WriteEndDocument();
 		}
 
+		// Записывает элемент типа содержимого по умолчанию.
 		private static void WriteDefault(XmlWriter w, string extension, string contentType)
 		{
 			w.WriteStartElement("Default");
@@ -298,6 +297,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает переопределение типа содержимого для части пакета.
 		private static void WriteOverride(XmlWriter w, string partName, string contentType)
 		{
 			w.WriteStartElement("Override");
@@ -306,6 +306,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Формирует корневые связи пакета Excel.
 		private static void WriteRootRels(XmlWriter w)
 		{
 			w.WriteStartDocument(true);
@@ -319,6 +320,7 @@ namespace HotelApp.Services
 			w.WriteEndDocument();
 		}
 
+		// Формирует описание книги Excel.
 		private static void WriteWorkbook(XmlWriter w, string sheetName)
 		{
 			w.WriteStartDocument(true);
@@ -335,6 +337,7 @@ namespace HotelApp.Services
 			w.WriteEndDocument();
 		}
 
+		// Формирует связи книги Excel с листом и стилями.
 		private static void WriteWorkbookRels(XmlWriter w)
 		{
 			w.WriteStartDocument(true);
@@ -345,6 +348,7 @@ namespace HotelApp.Services
 			w.WriteEndDocument();
 		}
 
+		// Записывает описание связи между частями пакета.
 		private static void WriteRelationship(XmlWriter w, string id, string type, string target)
 		{
 			w.WriteStartElement("Relationship");
@@ -354,12 +358,12 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Формирует таблицу стилей файла Excel.
 		private static void WriteStyles(XmlWriter w)
 		{
 			w.WriteStartDocument(true);
 			w.WriteStartElement("styleSheet", Ns);
 
-			// 164 = dd.mm.yyyy
 			w.WriteStartElement("numFmts");
 			w.WriteAttributeString("count", "1");
 			w.WriteStartElement("numFmt");
@@ -368,14 +372,12 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 			w.WriteEndElement();
 
-			// 0 - обычный, 1 - белый жирный для шапки
 			w.WriteStartElement("fonts");
 			w.WriteAttributeString("count", "2");
 			WriteFont(w, false, "FF000000");
 			WriteFont(w, true, "FFFFFFFF");
 			w.WriteEndElement();
 
-			// 0 - нет заливки, 1 - обязательная gray125, 2 - шапка
 			w.WriteStartElement("fills");
 			w.WriteAttributeString("count", "3");
 			WritePatternFill(w, "none", null);
@@ -393,7 +395,6 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 			w.WriteEndElement();
 
-			// 0 - без рамки, 1 - тонкая рамка
 			w.WriteStartElement("borders");
 			w.WriteAttributeString("count", "2");
 			WriteBorder(w, false);
@@ -405,7 +406,6 @@ namespace HotelApp.Services
 			WriteXf(w, 0, 0, 0, 0, null);
 			w.WriteEndElement();
 
-			// 0 - default, 1 - шапка, 2 - текст, 3 - дата, 4 - число
 			w.WriteStartElement("cellXfs");
 			w.WriteAttributeString("count", "5");
 			WriteXf(w, 0, 0, 0, 0, null);
@@ -428,6 +428,7 @@ namespace HotelApp.Services
 			w.WriteEndDocument();
 		}
 
+		// Записывает описание шрифта в таблицу стилей.
 		private static void WriteFont(XmlWriter w, bool bold, string color)
 		{
 			w.WriteStartElement("font");
@@ -447,6 +448,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает описание заливки ячейки в таблицу стилей.
 		private static void WritePatternFill(XmlWriter w, string patternType, string color)
 		{
 			w.WriteStartElement("fill");
@@ -462,6 +464,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает описание границ ячейки.
 		private static void WriteBorder(XmlWriter w, bool thin)
 		{
 			w.WriteStartElement("border");
@@ -474,6 +477,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает описание одной стороны границы ячейки.
 		private static void WriteBorderSide(XmlWriter w, bool thin, string side)
 		{
 			w.WriteStartElement(side);
@@ -487,6 +491,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает формат ячейки в таблицу стилей.
 		private static void WriteXf(XmlWriter w, int numFmtId, int fontId, int fillId, int borderId, string horizontal)
 		{
 			w.WriteStartElement("xf");
@@ -514,6 +519,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Формирует содержимое листа Excel.
 		private static void WriteSheet(XmlWriter w, string[] headers, IList<object[]> rows,
 			int[] columnWidths, bool includeRoomTypeValidation, bool includeAutoFilter)
 		{
@@ -565,7 +571,6 @@ namespace HotelApp.Services
 
 			w.WriteStartElement("sheetData");
 
-			// Шапка
 			w.WriteStartElement("row");
 			w.WriteAttributeString("r", "1");
 			w.WriteAttributeString("ht", "26");
@@ -574,7 +579,6 @@ namespace HotelApp.Services
 				WriteInlineCell(w, CellRef(i, 1), headers[i], 1);
 			w.WriteEndElement();
 
-			// Данные
 			for (int r = 0; r < rows.Count; r++)
 			{
 				int rowNumber = r + 2;
@@ -588,7 +592,7 @@ namespace HotelApp.Services
 				w.WriteEndElement();
 			}
 
-			w.WriteEndElement(); // sheetData
+			w.WriteEndElement();
 
 			if (includeAutoFilter && lastRow >= 1)
 			{
@@ -597,7 +601,6 @@ namespace HotelApp.Services
 				w.WriteEndElement();
 			}
 
-			// Выпадающий список для типа номера (колонка E) — только для шаблона гостей
 			if (includeRoomTypeValidation && lastRow >= 2)
 			{
 				w.WriteStartElement("dataValidations");
@@ -617,10 +620,11 @@ namespace HotelApp.Services
 				w.WriteEndElement();
 			}
 
-			w.WriteEndElement(); // worksheet
+			w.WriteEndElement();
 			w.WriteEndDocument();
 		}
 
+		// Записывает параметры ширины столбца листа.
 		private static void WriteColumn(XmlWriter w, int index, double width)
 		{
 			w.WriteStartElement("col");
@@ -631,6 +635,7 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Записывает ячейку со значением в лист Excel.
 		private static void WriteValueCell(XmlWriter w, string cellRef, object value)
 		{
 			if (value == null) return;
@@ -663,6 +668,7 @@ namespace HotelApp.Services
 			WriteInlineCell(w, cellRef, Convert.ToString(value, CultureInfo.InvariantCulture), 2);
 		}
 
+		// Записывает текстовую ячейку со встроенной строкой.
 		private static void WriteInlineCell(XmlWriter w, string cellRef, string text, int style)
 		{
 			w.WriteStartElement("c");
@@ -677,11 +683,13 @@ namespace HotelApp.Services
 			w.WriteEndElement();
 		}
 
+		// Формирует ссылку на ячейку по индексу столбца и номеру строки.
 		private static string CellRef(int columnIndex, int rowNumber)
 		{
 			return ColumnName(columnIndex + 1) + rowNumber.ToString(CultureInfo.InvariantCulture);
 		}
 
+		// Преобразует номер столбца в буквенное обозначение Excel.
 		private static string ColumnName(int columnNumber)
 		{
 			string result = string.Empty;
@@ -693,7 +701,5 @@ namespace HotelApp.Services
 			}
 			return result;
 		}
-
-		#endregion
 	}
 }

@@ -5,11 +5,11 @@ using HotelApp.ViewModels;
 
 namespace HotelApp.Services
 {
-	// Формирует аналитический отчёт в Excel: сводка по отелю и топ-5 гостей по сумме.
 	public static class AnalyticsReportService
 	{
 		public const int TopGuestsCount = 5;
 
+		// Формирует и сохраняет аналитический отчёт в файл Excel.
 		public static void Save(string path, AnalyticsViewModel source)
 		{
 			if (string.IsNullOrWhiteSpace(path))
@@ -19,7 +19,6 @@ namespace HotelApp.Services
 
 			var rows = new List<object[]>();
 
-			// --- Сводка по отелю ---
 			rows.Add(new object[] { "Дата отчёта", DateTime.Today.ToString("dd.MM.yyyy"), null, null, null });
 			rows.Add(new object[] { "Всего номеров", source.TotalRooms, null, null, null });
 			rows.Add(new object[] { "Свободно номеров", source.FreeRooms, null, null, null });
@@ -29,7 +28,6 @@ namespace HotelApp.Services
 			rows.Add(new object[] { "Ожидаемая выручка, ₽", Math.Round(source.ExpectedRevenue, 2), null, null, null });
 			rows.Add(new object[] { "Общая выручка, ₽", Math.Round(source.TotalRevenue, 2), null, null, null });
 
-			// --- Топ гостей ---
 			rows.Add(new object[] { string.Empty, null, null, null, null });
 			rows.Add(new object[] { "ТОП-" + TopGuestsCount + " ГОСТЕЙ ПО СУММЕ", null, null, null, null });
 			rows.Add(new object[] { "Место", "ФИО гостя", "Паспорт", "Суток", "Сумма, ₽" });
@@ -65,7 +63,7 @@ namespace HotelApp.Services
 				includeAutoFilter: false);
 		}
 
-		// Сумма в формате «1 234 567 ₽» — для сообщений и подсказок.
+		// Форматирует денежное значение для отображения в интерфейсе.
 		public static string FormatMoney(double value)
 		{
 			return value.ToString("N0", CultureInfo.GetCultureInfo("ru-RU")) + " ₽";

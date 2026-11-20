@@ -17,18 +17,21 @@ namespace HotelApp.Views
 {
 	public partial class AnalyticsView : UserControl
 	{
+		private bool _isDetailsDialogOpen;
+
+		// Инициализирует представление аналитики.
 		public AnalyticsView()
 		{
 			InitializeComponent();
 		}
 
-		// В MaterialDesign 4.9 для WPF нет встроенного StaggeredEntrance,
-		// поэтому делаем эквивалент: карточки по очереди всплывают и проявляются.
+		// Запускает анимацию появления элементов после загрузки представления.
 		private void AnalyticsView_Loaded(object sender, RoutedEventArgs e)
 		{
 			RunStaggeredEntrance();
 		}
 
+		// Выполняет последовательную анимацию появления карточек аналитики.
 		private void RunStaggeredEntrance()
 		{
 			var cards = new List<FrameworkElement>();
@@ -78,14 +81,13 @@ namespace HotelApp.Views
 			}
 			catch (Exception ex)
 			{
-				// Анимация не должна ломать экран: показываем карточки сразу.
 				foreach (var card in cards)
 					card.Opacity = 1;
 				System.Diagnostics.Debug.WriteLine("Анимация карточек аналитики: " + ex.Message);
 			}
 		}
 
-		// Экспорт аналитического отчёта: сводка по отелю + топ-5 гостей по сумме.
+		// Экспортирует аналитический отчёт в файл Excel.
 		private void ExportReport_Click(object sender, RoutedEventArgs e)
 		{
 			if (!(DataContext is AnalyticsViewModel vm)) return;
@@ -103,7 +105,6 @@ namespace HotelApp.Views
 			var mainVm = GetMainViewModel();
 			try
 			{
-				// Обновляем показатели, чтобы отчёт не содержал устаревших цифр.
 				vm.Refresh();
 				AnalyticsReportService.Save(dialog.FileName, vm);
 
@@ -117,33 +118,28 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Возвращает главную модель представления текущего окна.
 		private static MainViewModel GetMainViewModel()
 		{
 			var window = Application.Current.MainWindow;
 			return window != null ? window.DataContext as MainViewModel : null;
 		}
 
-		private bool _isDetailsDialogOpen;
-
+		// Открывает диалог с детализацией по выбранному типу номера.
 		private async void PieChart_DataClick(object sender, ChartPoint point)
 		{
-			// Защита от двойного клика: второй диалог не должен вставать в очередь
-			// за первым — именно это выглядело как «зависание» таблицы.
 			if (_isDetailsDialogOpen) return;
 
-			// Проверяем, что клик был по сектору (PieSeries), а не по легенде
 			if (!(point.SeriesView is PieSeries pieSeries)) return;
 			if (!(DataContext is AnalyticsViewModel vm)) return;
 
 			_isDetailsDialogOpen = true;
 			try
 			{
-				string typeName = pieSeries.Title; // "Стандарт", "Люкс" или "Конференц-зал"
+				string typeName = pieSeries.Title;
 
-				// Вызываем команду ViewModel — она заполнит SelectedTypeGuests
 				vm.ShowRoomTypeDetailsCommand.Execute(typeName);
 
-				// Открываем модальное окно с результатами
 				var window = Application.Current.MainWindow;
 				var template = window != null
 					? window.FindResource("RoomTypeDetailsDialogTemplate") as DataTemplate
@@ -153,7 +149,7 @@ namespace HotelApp.Views
 				var dialogContent = template.LoadContent() as FrameworkElement;
 				if (dialogContent == null) return;
 
-				dialogContent.DataContext = vm; // Привязываем к тому же ViewModel, где уже есть данные
+				dialogContent.DataContext = vm;
 
 				await DialogHost.Show(dialogContent, "RootDialog");
 			}

@@ -11,21 +11,29 @@ namespace HotelApp.Views
 {
 	public partial class SettingsView : UserControl
 	{
-		// Пока выставляем галочку темы программно, не применяем её повторно.
 		private bool _syncingTheme;
 
+		// Инициализирует представление настроек приложения.
 		public SettingsView()
 		{
 			InitializeComponent();
 			Loaded += SettingsView_Loaded;
 		}
 
+		// Синхронизирует элементы управления после загрузки представления.
 		private void SettingsView_Loaded(object sender, RoutedEventArgs e)
 		{
-			SyncThemeButtons();
+			try
+			{
+				SyncThemeButtons();
+			}
+			catch (Exception ex)
+			{
+				Services.AppDialog.Error("Ошибка загрузки настроек: " + ex.Message, "Ошибка");
+			}
 		}
 
-		// Синхронизирует выбранную радиокнопку с темой из ViewModel.
+		// Синхронизирует выбранную радиокнопку с текущей темой оформления.
 		private void SyncThemeButtons()
 		{
 			var vm = DataContext as SettingsViewModel;
@@ -48,50 +56,68 @@ namespace HotelApp.Views
 			}
 		}
 
+		// Применяет выбранную пользователем тему оформления.
 		private void Theme_Checked(object sender, RoutedEventArgs e)
 		{
-			if (_syncingTheme) return;
-
-			var vm = DataContext as SettingsViewModel;
-			var radio = sender as RadioButton;
-			if (vm == null || radio == null || radio.IsChecked != true) return;
-
-			if (radio.Tag is string themeName)
-				vm.SelectTheme(themeName);
-		}
-
-		private void RecordButton_Click(object sender, RoutedEventArgs e)
-		{
-			if (sender is Button btn && btn.Tag is HotkeySetting setting && DataContext is SettingsViewModel vm)
+			try
 			{
-				vm.StartRecording(setting);
+				if (_syncingTheme) return;
 
-				// Input выполняется уже после отрисовки (Render -> Loaded -> Input),
-				// поэтому TextBox к этому моменту гарантированно существует в дереве.
-				Dispatcher.InvokeAsync(() =>
-				{
-					var textBox = FindTextBoxForSetting(setting);
-					if (textBox != null)
-					{
-						FocusManager.SetFocusedElement(this, textBox);
-						// IsReadOnlyCaretVisible=True рисует каретку в read-only TextBox,
-						// но только когда у него реальный клавиатурный фокус.
-						textBox.Focus();
-						Keyboard.Focus(textBox);
-						textBox.CaretIndex = (textBox.Text ?? string.Empty).Length;
-						textBox.ScrollToEnd();
-					}
-					else
-					{
-						// Фолбэк: если WPF упрямится и не находит TextBox, 
-						// фокусируем сам UserControl. OnPreviewKeyDown всё равно перехватит клавиши!
-						FocusManager.SetFocusedElement(this, this);
-						Focus();
-					}
-				}, DispatcherPriority.Input);
+				var vm = DataContext as SettingsViewModel;
+				var radio = sender as RadioButton;
+				if (vm == null || radio == null || radio.IsChecked != true) return;
+
+				if (radio.Tag is string themeName)
+					vm.SelectTheme(themeName);
+			}
+			catch (Exception ex)
+			{
+				Services.AppDialog.Error("Ошибка применения темы: " + ex.Message, "Ошибка");
 			}
 		}
 
+		// Переводит выбранную горячую клавишу в режим записи.
+		private void RecordButton_Click(object sender, RoutedEventArgs e)
+		{
+			try
+			{
+				if (sender is Button btn && btn.Tag is HotkeySetting setting && DataContext is SettingsViewModel vm)
+				{
+					vm.StartRecording(setting);
+
+					Dispatcher.InvokeAsync(() =>
+					{
+						try
+						{
+							var textBox = FindTextBoxForSetting(setting);
+							if (textBox != null)
+							{
+								FocusManager.SetFocusedElement(this, textBox);
+								textBox.Focus();
+								Keyboard.Focus(textBox);
+								textBox.CaretIndex = (textBox.Text ?? string.Empty).Length;
+								textBox.ScrollToEnd();
+							}
+							else
+							{
+								FocusManager.SetFocusedElement(this, this);
+								Focus();
+							}
+						}
+						catch (Exception ex)
+						{
+							Services.AppDialog.Error("Ошибка установки фокуса записи: " + ex.Message, "Ошибка");
+						}
+					}, DispatcherPriority.Input);
+				}
+			}
+			catch (Exception ex)
+			{
+				Services.AppDialog.Error("Ошибка начала записи горячей клавиши: " + ex.Message, "Ошибка");
+			}
+		}
+
+		// Находит поле ввода, связанное с указанной настройкой горячей клавиши.
 		private TextBox FindTextBoxForSetting(HotkeySetting setting)
 		{
 			var itemsControl = FindVisualChild<ItemsControl>(this);
@@ -106,13 +132,13 @@ namespace HotelApp.Views
 			return null;
 		}
 
+		// Выполняет поиск поля ввода горячей клавиши внутри контейнера.
 		private TextBox FindTextBoxInContainer(DependencyObject container, HotkeySetting setting)
 		{
 			for (int i = 0; i < VisualTreeHelper.GetChildrenCount(container); i++)
 			{
 				var child = VisualTreeHelper.GetChild(container, i);
 
-				// Сравниваем ссылки на объекты (они должны быть идентичны благодаря {Binding})
 				if (child is TextBox textBox && ReferenceEquals(textBox.Tag, setting))
 					return textBox;
 
@@ -122,6 +148,7 @@ namespace HotelApp.Views
 			return null;
 		}
 
+		// Находит первый визуальный дочерний элемент указанного типа.
 		private T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
 		{
 			for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
@@ -135,29 +162,54 @@ namespace HotelApp.Views
 			return null;
 		}
 
+		// Сохраняет текущие настройки приложения.
 		private void Save_Click(object sender, RoutedEventArgs e)
-			=> (DataContext as SettingsViewModel)?.Save();
-
-		private void Reset_Click(object sender, RoutedEventArgs e)
 		{
-			var vm = DataContext as SettingsViewModel;
-			if (vm == null) return;
-
-			vm.ResetToDefaults();
-			SyncThemeButtons();
+			try
+			{
+				(DataContext as SettingsViewModel)?.Save();
+			}
+			catch (Exception ex)
+			{
+				Services.AppDialog.Error("Ошибка сохранения настроек: " + ex.Message, "Ошибка");
+			}
 		}
 
+		// Сбрасывает настройки к значениям по умолчанию.
+		private void Reset_Click(object sender, RoutedEventArgs e)
+		{
+			try
+			{
+				var vm = DataContext as SettingsViewModel;
+				if (vm == null) return;
+
+				vm.ResetToDefaults();
+				SyncThemeButtons();
+			}
+			catch (Exception ex)
+			{
+				Services.AppDialog.Error("Ошибка сброса настроек: " + ex.Message, "Ошибка");
+			}
+		}
+
+		// Перехватывает нажатия клавиш в режиме записи горячей клавиши.
 		protected override void OnPreviewKeyDown(KeyEventArgs e)
 		{
-			base.OnPreviewKeyDown(e);
+			try
+			{
+				base.OnPreviewKeyDown(e);
 
-			var vm = DataContext as SettingsViewModel;
-			if (vm == null) return;
+				var vm = DataContext as SettingsViewModel;
+				if (vm == null) return;
 
-			// Пока идёт запись, клавиши принадлежат настройкам: не даём им
-			// нажимать кнопки, прокручивать список или закрывать диалог.
-			if (vm.HandleKeyDown(e))
+				if (vm.HandleKeyDown(e))
+					e.Handled = true;
+			}
+			catch (Exception ex)
+			{
 				e.Handled = true;
+				Services.AppDialog.Error("Ошибка обработки сочетания клавиш: " + ex.Message, "Ошибка");
+			}
 		}
 	}
 }

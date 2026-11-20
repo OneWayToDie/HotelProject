@@ -13,24 +13,29 @@ namespace HotelApp.ViewModels
 	{
 		private readonly MainWindow _window;
 		private readonly MainViewModel _mainVm;
+		private string _gestureBeforeRecording;
+		private HotkeySetting _recordingSetting;
+		private string _selectedTheme = ThemeService.DefaultTheme;
+		private bool _isAnimationsEnabled = true;
 
+		// Получает коллекцию настраиваемых горячих клавиш.
 		public ObservableCollection<HotkeySetting> Hotkeys { get; } = new ObservableCollection<HotkeySetting>();
 
-		// Комбинация, которая была в поле до начала записи — для отмены по Esc
-		private string _gestureBeforeRecording;
-
-		// Какая строка сейчас в режиме записи (только одна одновременно)
-		private HotkeySetting _recordingSetting;
+		// Получает или задаёт текущую строку, находящуюся в режиме записи сочетания.
 		public HotkeySetting RecordingSetting
 		{
 			get => _recordingSetting;
-			set { _recordingSetting = value; OnPropertyChanged(); }
+			set
+			{
+				_recordingSetting = value;
+				OnPropertyChanged();
+			}
 		}
 
+		// Получает текст текущего статуса настроек.
 		public string StatusMessage { get; private set; } = "Готово";
 
-		// Выбранная тема оформления (Indigo, Emerald, Ruby, Amber)
-		private string _selectedTheme = ThemeService.DefaultTheme;
+		// Получает выбранную тему оформления приложения.
 		public string SelectedTheme
 		{
 			get => _selectedTheme;
@@ -42,8 +47,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Плавные анимации: применяются сразу, сохраняются в settings.json
-		private bool _isAnimationsEnabled = true;
+		// Получает или задаёт признак включения анимаций интерфейса.
 		public bool IsAnimationsEnabled
 		{
 			get => _isAnimationsEnabled;
@@ -56,6 +60,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Создаёт модель представления настроек приложения.
 		public SettingsViewModel(MainWindow window, MainViewModel mainVm)
 		{
 			_window = window;
@@ -63,6 +68,7 @@ namespace HotelApp.ViewModels
 			LoadFromSettings();
 		}
 
+		// Загружает текущие настройки из файла конфигурации.
 		private void LoadFromSettings()
 		{
 			var settings = AppSettings.Load();
@@ -95,11 +101,11 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Переводит выбранное действие в режим записи сочетания клавиш.
 		public void StartRecording(HotkeySetting setting)
 		{
 			if (setting == null || setting == RecordingSetting) return;
 
-			// Если запись уже шла в другой строке — возвращаем ей прежнюю комбинацию
 			if (RecordingSetting != null)
 			{
 				RecordingSetting.IsRecording = false;
@@ -114,7 +120,7 @@ namespace HotelApp.ViewModels
 			OnPropertyChanged(nameof(StatusMessage));
 		}
 
-		// Применяем тему сразу (живой предпросмотр), в settings.json попадает по кнопке «Сохранить».
+		// Применяет выбранную тему оформления в режиме предварительного просмотра.
 		public void SelectTheme(string themeName)
 		{
 			string normalized = ThemeService.Normalize(themeName);
@@ -124,17 +130,14 @@ namespace HotelApp.ViewModels
 			OnPropertyChanged(nameof(StatusMessage));
 		}
 
-		// Возвращает true, если нажатие обработано и его нельзя передавать дальше
-		// (иначе, например, Space нажал бы кнопку «Записать» ещё раз).
+		// Обрабатывает нажатие клавиш в режиме записи сочетания и возвращает признак обработки.
 		public bool HandleKeyDown(KeyEventArgs e)
 		{
 			if (RecordingSetting == null) return false;
 
-			// Alt+... приходит как Key.System, настоящая клавиша лежит в SystemKey
 			var key = e.Key == Key.System ? e.SystemKey : e.Key;
 			if (key == Key.None) return false;
 
-			// Одиночные модификаторы ничего не записываем
 			if (key == Key.LeftCtrl || key == Key.RightCtrl ||
 				key == Key.LeftShift || key == Key.RightShift ||
 				key == Key.LeftAlt || key == Key.RightAlt ||
@@ -144,7 +147,6 @@ namespace HotelApp.ViewModels
 
 			var recording = RecordingSetting;
 
-			// Esc отменяет запись и оставляет прежнюю комбинацию
 			if (key == Key.Escape)
 			{
 				recording.Gesture = _gestureBeforeRecording;
@@ -179,25 +181,12 @@ namespace HotelApp.ViewModels
 			return true;
 		}
 
-		// Собирает комбинацию в формате, который понимает KeyGestureConverter: Ctrl+Shift+K
-		private static string BuildGesture(Key key, ModifierKeys modifiers)
-		{
-			var parts = new List<string>();
-			if ((modifiers & ModifierKeys.Control) != 0) parts.Add("Ctrl");
-			if ((modifiers & ModifierKeys.Shift) != 0) parts.Add("Shift");
-			if ((modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
-			if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Windows");
-
-			parts.Add(key.ToString());
-			return string.Join("+", parts);
-		}
-
+		// Сохраняет текущие настройки и применяет их в приложении.
 		public void Save()
 		{
 			var settings = AppSettings.Load();
 			foreach (var h in Hotkeys)
 			{
-				// Пустые значения и заглушка «—» не должны попадать в settings.json
 				if (string.IsNullOrWhiteSpace(h.Gesture) || h.Gesture == "—") continue;
 				settings.Hotkeys[h.ActionKey] = h.Gesture;
 			}
@@ -215,6 +204,7 @@ namespace HotelApp.ViewModels
 			OnPropertyChanged(nameof(StatusMessage));
 		}
 
+		// Сбрасывает настройки к значениям по умолчанию без сохранения в файл.
 		public void ResetToDefaults()
 		{
 			var defaults = new AppSettings();
@@ -232,8 +222,26 @@ namespace HotelApp.ViewModels
 			OnPropertyChanged(nameof(StatusMessage));
 		}
 
+		// Формирует строковое представление сочетания клавиш.
+		private static string BuildGesture(Key key, ModifierKeys modifiers)
+		{
+			var parts = new List<string>();
+			if ((modifiers & ModifierKeys.Control) != 0) parts.Add("Ctrl");
+			if ((modifiers & ModifierKeys.Shift) != 0) parts.Add("Shift");
+			if ((modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
+			if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Windows");
+
+			parts.Add(key.ToString());
+			return string.Join("+", parts);
+		}
+
+		// Событие уведомления об изменении значения свойства.
 		public event PropertyChangedEventHandler PropertyChanged;
+
+		// Уведомляет подписчиков об изменении свойства.
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
-			=> PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+		{
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+		}
 	}
 }

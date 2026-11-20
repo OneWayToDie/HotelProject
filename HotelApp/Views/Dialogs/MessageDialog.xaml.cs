@@ -29,7 +29,6 @@ namespace HotelApp.Views.Dialogs
 		Cancel
 	}
 
-	// Единое окно сообщений в стиле приложения.
 	public partial class MessageDialog : Window
 	{
 		private readonly MessageDialogButtons _buttons;
@@ -37,6 +36,7 @@ namespace HotelApp.Views.Dialogs
 
 		public MessageDialogResult Result { get; private set; } = MessageDialogResult.Cancel;
 
+		// Инициализирует диалоговое окно сообщения с заданными параметрами отображения.
 		public MessageDialog(string title, string message, MessageDialogType type,
 			MessageDialogButtons buttons, string primaryText = null, string secondaryText = null,
 			bool destructive = false)
@@ -54,6 +54,7 @@ namespace HotelApp.Views.Dialogs
 			ConfigureButtons(primaryText, secondaryText);
 		}
 
+		// Настраивает значок диалога в зависимости от типа сообщения.
 		private void ConfigureIcon(MessageDialogType type)
 		{
 			switch (type)
@@ -81,6 +82,7 @@ namespace HotelApp.Views.Dialogs
 			}
 		}
 
+		// Настраивает подписи, видимость и режим подтверждения кнопок диалога.
 		private void ConfigureButtons(string primaryText, string secondaryText)
 		{
 			switch (_buttons)
@@ -101,7 +103,6 @@ namespace HotelApp.Views.Dialogs
 
 			if (!_destructive) return;
 
-			// Опасное действие: красная кнопка и обязательное подтверждение
 			PrimaryButton.Content = string.IsNullOrWhiteSpace(primaryText) ? "Удалить" : primaryText;
 			SecondaryButton.Content = string.IsNullOrWhiteSpace(secondaryText) ? "Отмена" : secondaryText;
 			PrimaryButton.Background = new SolidColorBrush(Color.FromRgb(198, 40, 40));
@@ -110,11 +111,13 @@ namespace HotelApp.Views.Dialogs
 			ConfirmCheckBox.Visibility = Visibility.Visible;
 		}
 
+		// Обрабатывает изменение состояния подтверждения опасного действия.
 		private void ConfirmCheckBox_Changed(object sender, RoutedEventArgs e)
 		{
 			PrimaryButton.IsEnabled = ConfirmCheckBox.IsChecked == true;
 		}
 
+		// Обрабатывает нажатие основной кнопки и фиксирует результат диалога.
 		private void Primary_Click(object sender, RoutedEventArgs e)
 		{
 			if (_destructive && ConfirmCheckBox.IsChecked != true) return;
@@ -132,6 +135,7 @@ namespace HotelApp.Views.Dialogs
 			DialogResult = true;
 		}
 
+		// Обрабатывает нажатие дополнительной кнопки и закрывает диалог с отказом.
 		private void Secondary_Click(object sender, RoutedEventArgs e)
 		{
 			Result = _buttons == MessageDialogButtons.YesNo
@@ -140,6 +144,7 @@ namespace HotelApp.Views.Dialogs
 			DialogResult = false;
 		}
 
+		// Обрабатывает нажатие клавиши Escape для закрытия диалога.
 		private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
 		{
 			if (e.Key != Key.Escape) return;

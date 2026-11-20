@@ -13,7 +13,6 @@ namespace HotelApp.ViewModels
 {
 	public class GuestsViewModel : INotifyPropertyChanged
 	{
-		// Порог VIP-статуса: больше 100 000 ₽ или больше 5 суток
 		private const double VipRevenueThreshold = 100000;
 		private const int VipDaysThreshold = 5;
 
@@ -35,6 +34,9 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		// Инициализирует модель представления гостей и загружает данные.
 		public GuestsViewModel(IntPtr hotelPtr, MainViewModel mainVm)
 		{
 			_hotelPtr = hotelPtr;
@@ -42,8 +44,7 @@ namespace HotelApp.ViewModels
 			RefreshData();
 		}
 
-		// Снимок всех гостей с агрегатами по проживаниям и броням — для отчётов.
-		// Без записи в журнал и модальных окон: исключение обрабатывает вызывающий код.
+		// Возвращает снимок всех гостей с агрегированными данными для отчётов.
 		public static List<GuestModel> LoadSnapshot(IntPtr hotelPtr)
 		{
 			var vm = new GuestsViewModel(hotelPtr, null, false);
@@ -51,6 +52,7 @@ namespace HotelApp.ViewModels
 			return vm.Guests.ToList();
 		}
 
+		// Инициализирует модель представления гостей с возможностью отложенной загрузки.
 		private GuestsViewModel(IntPtr hotelPtr, MainViewModel mainVm, bool load)
 		{
 			_hotelPtr = hotelPtr;
@@ -58,6 +60,7 @@ namespace HotelApp.ViewModels
 			if (load) RefreshData();
 		}
 
+		// Обновляет список гостей и обрабатывает ошибки загрузки.
 		public void RefreshData()
 		{
 			try { LoadGuests(); }
@@ -69,13 +72,13 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Загружает гостей из нативной библиотеки и рассчитывает их показатели.
 		private void LoadGuests()
 		{
 			const int max = 1000;
 			var buffer = new CGuest[max];
 			int count = NativeMethods.Hotel_GetAllGuests(_hotelPtr, buffer, max);
 
-			// 1. Справочник номеров: roomId -> (buildingName, roomNumber, basePrice, typeText)
 			var roomInfo = new Dictionary<int, (string Building, string Number, double Price, string TypeText)>();
 			var rooms = new CRoom[max];
 			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, max);
@@ -91,10 +94,8 @@ namespace HotelApp.ViewModels
 				roomInfo[rooms[i].Id] = (bName, rooms[i].Number, rooms[i].BasePrice, typeText);
 			}
 
-			// 2. Собираем историю по каждому гостю (проживания + брони)
 			var historyByGuest = BuildHistory(roomInfo);
 
-			// 3. Фильтр и формирование GuestModel
 			string search = (SearchText ?? string.Empty).Trim().ToLower();
 			Guests.Clear();
 			int rowNumber = 0;
@@ -114,7 +115,6 @@ namespace HotelApp.ViewModels
 					? list
 					: new List<StayHistoryItem>();
 
-				// Сортируем по дате заезда
 				history = history.OrderBy(h => h.CheckIn).ToList();
 
 				var guest = new GuestModel
@@ -125,7 +125,6 @@ namespace HotelApp.ViewModels
 					Passport = buffer[i].Passport
 				};
 
-				// Агрегация
 				int totalDays = 0;
 				double totalRevenue = 0;
 				foreach (var h in history)
@@ -138,11 +137,8 @@ namespace HotelApp.ViewModels
 				guest.TotalDays = totalDays;
 				guest.TotalRevenue = totalRevenue;
 				guest.LastRoomInfo = ComputeLastRoomInfo(history);
-
-				// VIP: больше 100 000 ₽ или больше 5 суток проживания
 				guest.IsVip = totalRevenue > VipRevenueThreshold || totalDays > VipDaysThreshold;
 
-				// Старые свойства (для совместимости, если где-то используются)
 				var nearest = PickNearest(history);
 				guest.StayDisplay = nearest != null
 					? $"{nearest.CheckIn:dd.MM.yyyy} — {nearest.CheckOut:dd.MM.yyyy}"
@@ -152,15 +148,13 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Собирает историю проживаний и броней по ключу гостя
+		// Формирует историю проживаний и бронирований по ключам гостей.
 		private Dictionary<string, List<StayHistoryItem>> BuildHistory(
 			Dictionary<int, (string Building, string Number, double Price, string TypeText)> roomInfo)
 		{
 			var result = new Dictionary<string, List<StayHistoryItem>>(StringComparer.OrdinalIgnoreCase);
 			var today = DateTime.Today;
-			var todayStr = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-			// 1. Текущие проживания (статус = 1)
 			var rooms = new CRoom[1000];
 			int roomCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rooms, 1000);
 			for (int i = 0; i < roomCount; i++)
@@ -189,7 +183,6 @@ namespace HotelApp.ViewModels
 				});
 			}
 
-			// 2. Бронирования (все, включая будущие)
 			var bookings = new CBooking[1000];
 			int bookingCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bookings, 1000);
 			for (int i = 0; i < bookingCount; i++)
@@ -203,14 +196,13 @@ namespace HotelApp.ViewModels
 				int days = (cout.Date - cin.Date).Days;
 				if (days <= 0) days = 1;
 
-				// Определяем статус
 				StayStatus status;
 				if (cin.Date <= today && cout.Date > today)
-					status = StayStatus.Current; // бронь, которая уже идёт (гость заселен)
+					status = StayStatus.Current;
 				else if (cin.Date > today)
-					status = StayStatus.Booking; // будущая
+					status = StayStatus.Booking;
 				else
-					status = StayStatus.Past;    // прошедшая (редко, но бывает)
+					status = StayStatus.Past;
 
 				AddHistory(result, key, new StayHistoryItem
 				{
@@ -229,7 +221,7 @@ namespace HotelApp.ViewModels
 			return result;
 		}
 
-		// Добавляет запись, защищая от дубликатов по (roomId, checkIn, checkOut)
+		// Добавляет запись в историю гостя, исключая дубликаты по номеру и датам.
 		private static void AddHistory(
 			Dictionary<string, List<StayHistoryItem>> dict,
 			string key, StayHistoryItem item)
@@ -239,7 +231,6 @@ namespace HotelApp.ViewModels
 				list = new List<StayHistoryItem>();
 				dict[key] = list;
 			}
-			// Дубликат: тот же номер и те же даты
 			if (list.Any(h => h.RoomId == item.RoomId
 				&& h.CheckIn.Date == item.CheckIn.Date
 				&& h.CheckOut.Date == item.CheckOut.Date))
@@ -247,17 +238,15 @@ namespace HotelApp.ViewModels
 			list.Add(item);
 		}
 
-		// Вычисляет LastRoomInfo по правилу: текущий > ближайшая бронь > последний прошлый > "—"
+		// Определяет отображаемую информацию о последнем или актуальном размещении гостя.
 		private static string ComputeLastRoomInfo(List<StayHistoryItem> history)
 		{
 			if (history == null || history.Count == 0) return "—";
 
-			// Приоритет 1: текущее проживание
 			var current = history.FirstOrDefault(h => h.Status == StayStatus.Current);
 			if (current != null)
 				return $"{current.BuildingName}, {current.RoomNumber}";
 
-			// Приоритет 2: ближайшая будущая бронь
 			var booking = history
 				.Where(h => h.Status == StayStatus.Booking)
 				.OrderBy(h => h.CheckIn)
@@ -265,7 +254,6 @@ namespace HotelApp.ViewModels
 			if (booking != null)
 				return $"{booking.BuildingName}, {booking.RoomNumber} (бронь)";
 
-			// Приоритет 3: последний завершённый
 			var past = history
 				.Where(h => h.Status == StayStatus.Past)
 				.OrderByDescending(h => h.CheckOut)
@@ -276,7 +264,7 @@ namespace HotelApp.ViewModels
 			return "—";
 		}
 
-		// Ближайшее проживание для старого StayDisplay
+		// Возвращает ближайшее проживание для отображения периода пребывания.
 		private static StayHistoryItem PickNearest(List<StayHistoryItem> list)
 		{
 			if (list == null || list.Count == 0) return null;
@@ -289,7 +277,7 @@ namespace HotelApp.ViewModels
 			return ordered[ordered.Count - 1];
 		}
 
-		// Удаление гостя (без изменений)
+		// Удаляет гостя из базы, если он не проживает в номере.
 		public bool DeleteGuest(GuestModel guest)
 		{
 			if (guest == null) return false;
@@ -322,6 +310,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Находит номер, в котором в данный момент проживает указанный гость.
 		public string FindStayingRoomNumber(GuestModel guest)
 		{
 			if (guest == null) return null;
@@ -339,6 +328,7 @@ namespace HotelApp.ViewModels
 			return null;
 		}
 
+		// Формирует ключ для сопоставления записей гостя.
 		private static string StayKey(string name, string passport)
 		{
 			if (!string.IsNullOrWhiteSpace(passport)) return "P:" + passport.Trim().ToUpperInvariant();
@@ -346,8 +336,10 @@ namespace HotelApp.ViewModels
 			return null;
 		}
 
-		public event PropertyChangedEventHandler PropertyChanged;
+		// Уведомляет об изменении значения свойства.
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
-			=> PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+		{
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+		}
 	}
 }

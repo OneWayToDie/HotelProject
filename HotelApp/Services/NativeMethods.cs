@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 namespace HotelApp.Services
@@ -11,8 +11,8 @@ namespace HotelApp.Services
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 20)] public string Number;
 		public int Capacity;
 		public double BasePrice;
-		public int Status; // 0-Free, 1-Occupied, 2-Cleaning
-		public int Type;   // 0-Standard, 1-Lux, 2-Conference
+		public int Status;
+		public int Type;
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 100)] public string GuestName;
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 50)] public string GuestPassport;
 		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 20)] public string CheckInDate;
@@ -49,57 +49,75 @@ namespace HotelApp.Services
 	{
 		private const string DllName = "HotelLogic.dll";
 
+		// Создаёт экземпляр нативного объекта отеля.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern IntPtr Hotel_Create();
 
+		// Уничтожает экземпляр нативного объекта отеля.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_Destroy(IntPtr ptr);
 
+		// Добавляет новый корпус в отель.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_AddBuilding(IntPtr ptr, string name);
 
+		// Добавляет новый номер в указанный корпус.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_AddRoom(IntPtr ptr, int buildingId, int type, string number, double price);
 
+		// Выполняет заселение гостя в номер.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern bool Hotel_CheckIn(IntPtr ptr, int roomId, string name, string passport, string inDate, string outDate, int days);
 
+		// Выполняет выселение гостя из номера и возвращает сумму к оплате.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern double Hotel_CheckOut(IntPtr ptr, int roomId);
 
+		// Завершает уборку указанного номера.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_FinishCleaning(IntPtr ptr, int roomId);
 
+		// Обновляет базовую цену указанного номера.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_UpdatePrice(IntPtr ptr, int roomId, double newPrice);
 
+		// Сохраняет текущее состояние отеля в файл.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern bool Hotel_Save(IntPtr ptr, string filename);
 
+		// Загружает состояние отеля из файла.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern bool Hotel_Load(IntPtr ptr, string filename);
 
+		// Возвращает список всех номеров отеля в переданный буфер.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllRooms(IntPtr ptr, [Out] CRoom[] buffer, int maxSize);
 
+		// Возвращает список всех корпусов отеля в переданный буфер.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllBuildings(IntPtr ptr, [Out] CBuilding[] buffer, int maxSize);
 
+		// Возвращает список всех гостей отеля в переданный буфер.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllGuests(IntPtr ptr, [Out] CGuest[] buffer, int maxSize);
 
+		// Возвращает накопленную выручку отеля.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern double Hotel_GetTotalRevenue(IntPtr ptr);
 
+		// Создаёт бронирование номера для гостя.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern bool Hotel_BookRoom(IntPtr ptr, int roomId, string name, string passport, string inDate, string outDate);
 
+		// Возвращает список всех бронирований отеля в переданный буфер.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int Hotel_GetAllBookings(IntPtr ptr, [Out] CBooking[] buffer, int maxSize);
 
+		// Удаляет гостя по идентификатору.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern bool Hotel_DeleteGuest(IntPtr ptr, int guestId);
 
+		// Очищает все данные отеля и возвращает его в начальное состояние.
 		[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern void Hotel_ClearAll(IntPtr ptr);
 	}

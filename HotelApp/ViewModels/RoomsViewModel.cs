@@ -13,17 +13,15 @@ namespace HotelApp.ViewModels
 	public class RoomsViewModel : INotifyPropertyChanged
 	{
 		private IntPtr _hotelPtr;
-		private MainViewModel _mainVm; // Ссылка на главную VM
+		private MainViewModel _mainVm;
 		private string _searchText = string.Empty;
 
 		public ObservableCollection<BuildingModel> Buildings { get; } = new ObservableCollection<BuildingModel>();
 		public ObservableCollection<RoomModel> Rooms { get; } = new ObservableCollection<RoomModel>();
 		public ObservableCollection<BookingModel> Bookings { get; } = new ObservableCollection<BookingModel>();
 
-		// Текущий фильтр: 0 - Все, 1 - Свободные, 2 - Занятые
 		public int CurrentFilter { get; set; } = 0;
 
-		// Строка живого поиска (без кнопки "Найти")
 		public string SearchText
 		{
 			get => _searchText;
@@ -36,6 +34,9 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		public event PropertyChangedEventHandler PropertyChanged;
+
+		// Инициализирует модель представления номеров и загружает данные.
 		public RoomsViewModel(IntPtr hotelPtr, MainViewModel mainVm)
 		{
 			_hotelPtr = hotelPtr;
@@ -43,6 +44,7 @@ namespace HotelApp.ViewModels
 			RefreshData();
 		}
 
+		// Обновляет данные о корпусах, номерах и бронированиях.
 		public void RefreshData()
 		{
 			try
@@ -56,16 +58,15 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Загружает данные из нативной библиотеки с учётом фильтра и поиска.
 		private void LoadRooms()
 		{
-			// Загружаем корпуса
 			var bBuffer = new CBuilding[100];
 			int bCount = NativeMethods.Hotel_GetAllBuildings(_hotelPtr, bBuffer, 100);
 			Buildings.Clear();
 			for (int i = 0; i < bCount; i++)
 				Buildings.Add(new BuildingModel { Id = bBuffer[i].Id, Name = bBuffer[i].Name });
 
-			// Загружаем номера
 			var rBuffer = new CRoom[1000];
 			int rCount = NativeMethods.Hotel_GetAllRooms(_hotelPtr, rBuffer, 1000);
 
@@ -74,11 +75,9 @@ namespace HotelApp.ViewModels
 			Rooms.Clear();
 			for (int i = 0; i < rCount; i++)
 			{
-				// ПРИМЕНЯЕМ ФИЛЬТР
-				if (CurrentFilter == 1 && rBuffer[i].Status != 0) continue; // Показываем только Свободные
-				if (CurrentFilter == 2 && rBuffer[i].Status != 1) continue; // Показываем только Занятые
+				if (CurrentFilter == 1 && rBuffer[i].Status != 0) continue;
+				if (CurrentFilter == 2 && rBuffer[i].Status != 1) continue;
 
-				// ПРИМЕНЯЕМ ПОИСК (по номеру и по ФИО гостя, без учета регистра)
 				if (search.Length > 0)
 				{
 					string number = (rBuffer[i].Number ?? string.Empty).ToLower();
@@ -101,9 +100,8 @@ namespace HotelApp.ViewModels
 					CheckOutDate = rBuffer[i].CheckOutDate
 				});
 			}
-			_mainVm.UpdateStats(); // Обновляем цифры в шапке
+			_mainVm.UpdateStats();
 
-			// Загружаем бронирования
 			var bkBuffer = new CBooking[1000];
 			int bkCount = NativeMethods.Hotel_GetAllBookings(_hotelPtr, bkBuffer, 1000);
 
@@ -121,12 +119,10 @@ namespace HotelApp.ViewModels
 				});
 			}
 
-			// Показываем бронь в таблице номеров и подсвечиваем ожидающих заезда
 			string todayStr = DateTime.Today.ToString("yyyy-MM-dd");
 
 			foreach (var room in Rooms)
 			{
-				// Ищем бронь, которая начинается сегодня или уже идет
 				var activeBooking = Bookings.FirstOrDefault(b => b.RoomId == room.Id
 					&& string.Compare(b.CheckInDate, todayStr) <= 0
 					&& string.Compare(b.CheckOutDate, todayStr) > 0);
@@ -138,7 +134,6 @@ namespace HotelApp.ViewModels
 				}
 				else
 				{
-					// Если нет активной брони на сегодня, показываем ближайшую будущую
 					var booking = Bookings.Where(b => b.RoomId == room.Id)
 										  .OrderBy(b => b.CheckInDate)
 										  .FirstOrDefault();
@@ -149,7 +144,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-
+		// Выселяет гостя из указанного номера.
 		public void CheckOut(int roomId)
 		{
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
@@ -178,7 +173,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Завершить уборку
+		// Завершает уборку указанного номера.
 		public void FinishCleaning(int roomId)
 		{
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
@@ -198,6 +193,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Обновляет базовую цену указанного номера.
 		public void UpdatePrice(int roomId, double newPrice)
 		{
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
@@ -223,6 +219,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Заселяет гостя в указанный номер.
 		public void CheckIn(int roomId, string guestName, string passport, string inDate, string outDate, int days)
 		{
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
@@ -230,7 +227,6 @@ namespace HotelApp.ViewModels
 
 			try
 			{
-				// Нельзя заселить на даты, которые уже забронированы другим гостем
 				if (_mainVm.HasBookingConflict(roomId, inDate, outDate, guestName, passport))
 				{
 					_mainVm.AddLog($"Заселение {guestName} в номер {roomNumber} не выполнено: даты заняты бронью.", LogType.Error);
@@ -239,13 +235,12 @@ namespace HotelApp.ViewModels
 					return;
 				}
 
-				// Вызываем C++ с 6 аргументами
 				bool success = NativeMethods.Hotel_CheckIn(_hotelPtr, roomId, guestName, passport, inDate, outDate, days);
 
 				if (success)
 				{
 					RefreshData();
-					_mainVm.SaveData(); // Сохраняем в файл
+					_mainVm.SaveData();
 					_mainVm.AddLog($"Заселение: {guestName} -> номер {roomNumber}, {inDate} - {outDate} ({days} дн.).", LogType.Success);
 					ToastService.Success($"Гость {guestName} заселён в номер {roomNumber}.");
 				}
@@ -261,7 +256,7 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Бронирование номера на будущие даты
+		// Создаёт бронирование номера на указанные даты.
 		public void BookRoom(int roomId, string guestName, string passport, string inDate, string outDate)
 		{
 			var room = Rooms.FirstOrDefault(r => r.Id == roomId);
@@ -291,14 +286,14 @@ namespace HotelApp.ViewModels
 			}
 		}
 
-		// Единая обработка ошибок нативного слоя: журнал + сообщение пользователю
+		// Обрабатывает ошибку операции и уведомляет пользователя.
 		private void HandleError(string action, Exception ex)
 		{
 			_mainVm.AddLog($"{action}: {ex.Message}", LogType.Error);
 			AppDialog.Error($"Не удалось выполнить действие «{action}».\n{ex.Message}", "Ошибка");
 		}
 
-		public event PropertyChangedEventHandler PropertyChanged;
+		// Уведомляет об изменении значения свойства.
 		protected void OnPropertyChanged([CallerMemberName] string name = null)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

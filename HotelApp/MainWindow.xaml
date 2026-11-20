@@ -7,10 +7,12 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource MaterialDesignPaper}">
 
+    <!-- Контекст данных главного окна -->
     <Window.DataContext>
         <vm:MainViewModel/>
     </Window.DataContext>
 
+    <!-- Ресурсы главного окна -->
     <Window.Resources>
         <!-- ШАБЛОН: ОКНО ДОБАВЛЕНИЯ КОРПУСА -->
         <DataTemplate x:Key="AddBuildingDialogTemplate">
@@ -277,7 +279,7 @@
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal"
                       FontSize="13"
-                      RowHeight="30"
+                      RowHeight="36"
                       EnableRowVirtualization="True"
                       EnableColumnVirtualization="True"
                       VirtualizingPanel.IsVirtualizing="True"
@@ -321,8 +323,11 @@
 
     </Window.Resources>
 
+    <!-- Корневой контейнер диалогов -->
     <materialDesign:DialogHost Identifier="RootDialog">
+        <!-- Основная сетка главного окна -->
         <Grid>
+            <!-- Колонки основной разметки -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="260"/>
                 <ColumnDefinition Width="*"/>
@@ -444,8 +449,9 @@
                 </DockPanel>
             </Border>
 
-            <!-- ПРАВАЯ ЧАСТЬ (Восстановлена!) -->
+            <!-- Правая часть главного окна -->
             <Grid Grid.Column="1">
+                <!-- Строки разметки правой части -->
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>

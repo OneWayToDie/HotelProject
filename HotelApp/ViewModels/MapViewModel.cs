@@ -9,14 +9,16 @@ namespace HotelApp.ViewModels
 {
 	public class MapViewModel
 	{
-		// Номера, сгруппированные по корпусам
+		// Получает коллекцию корпусов с номерами для отображения на карте отеля.
 		public ObservableCollection<BuildingMapModel> Buildings { get; } = new ObservableCollection<BuildingMapModel>();
 
+		// Создаёт модель представления карты отеля и загружает данные.
 		public MapViewModel(IntPtr hotelPtr)
 		{
 			Refresh(hotelPtr);
 		}
 
+		// Обновляет данные карты отеля.
 		public void Refresh(IntPtr hotelPtr)
 		{
 			try
@@ -29,9 +31,9 @@ namespace HotelApp.ViewModels
 			}
 		}
 
+		// Загружает данные корпусов и номеров для построения карты.
 		private void LoadMap(IntPtr hotelPtr)
 		{
-			// 1. Имена корпусов (BuildingId -> Название)
 			var bBuffer = new CBuilding[100];
 			int bCount = NativeMethods.Hotel_GetAllBuildings(hotelPtr, bBuffer, 100);
 
@@ -39,40 +41,46 @@ namespace HotelApp.ViewModels
 			for (int i = 0; i < bCount; i++)
 				buildingNames[bBuffer[i].Id] = bBuffer[i].Name;
 
-			// 2. Все номера
-			var buffer = new CRoom[1000];
-			int count = NativeMethods.Hotel_GetAllRooms(hotelPtr, buffer, 1000);
+			var rBuffer = new CRoom[500];
+			int rCount = NativeMethods.Hotel_GetAllRooms(hotelPtr, rBuffer, 500);
 
-			var rooms = new List<RoomModel>(count);
-			for (int i = 0; i < count; i++)
+			var roomsByBuilding = new Dictionary<int, List<RoomModel>>();
+			for (int i = 0; i < rCount; i++)
 			{
-				rooms.Add(new RoomModel
+				int bId = rBuffer[i].BuildingId;
+				if (!roomsByBuilding.ContainsKey(bId))
+					roomsByBuilding[bId] = new List<RoomModel>();
+
+				roomsByBuilding[bId].Add(new RoomModel
 				{
-					Id = buffer[i].Id,
-					BuildingId = buffer[i].BuildingId,
-					Number = buffer[i].Number,
-					Capacity = buffer[i].Capacity,
-					BasePrice = buffer[i].BasePrice,
-					Status = buffer[i].Status,
-					Type = buffer[i].Type,
-					GuestName = buffer[i].GuestName,
-					CheckInDate = buffer[i].CheckInDate,
-					CheckOutDate = buffer[i].CheckOutDate
+					Id = rBuffer[i].Id,
+					BuildingId = rBuffer[i].BuildingId,
+					Number = rBuffer[i].Number,
+					Capacity = rBuffer[i].Capacity,
+					BasePrice = rBuffer[i].BasePrice,
+					Status = rBuffer[i].Status,
+					Type = rBuffer[i].Type,
+					GuestName = rBuffer[i].GuestName
 				});
 			}
 
-			// 3. Группируем по корпусу через LINQ
 			Buildings.Clear();
-			foreach (var group in rooms.GroupBy(r => r.BuildingId).OrderBy(g => g.Key))
+			foreach (var kvp in roomsByBuilding.OrderBy(b => b.Key))
 			{
-				Buildings.Add(new BuildingMapModel
+				string name = buildingNames.ContainsKey(kvp.Key)
+					? buildingNames[kvp.Key]
+					: $"Корпус {kvp.Key}";
+
+				var buildingMap = new BuildingMapModel
 				{
-					BuildingId = group.Key,
-					BuildingName = buildingNames.TryGetValue(group.Key, out string name)
-						? name
-						: $"Корпус {group.Key}",
-					Rooms = new ObservableCollection<RoomModel>(group)
-				});
+					BuildingId = kvp.Key,
+					BuildingName = name
+				};
+
+				foreach (var room in kvp.Value.OrderBy(r => r.Number))
+					buildingMap.Rooms.Add(room);
+
+				Buildings.Add(buildingMap);
 			}
 		}
 	}
